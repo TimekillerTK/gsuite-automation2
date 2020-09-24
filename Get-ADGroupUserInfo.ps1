@@ -27,6 +27,7 @@ function Get-ADGroupUserInfo {
         $value = Get-ADGroupMember -Identity $Group -Recursive -Server $Server
         
         # Spaghetti code below, which will need to be untangled and incorporated tomorrow:
+        #Spaghetti code was fixed at work, but guess what, I forgot to commit the changes
         $list1 = For ($i = 0; $i -lt 15; $i++ ) {
             [pscustomobject]@{
                 Email = "$i@something.com"
