@@ -26,8 +26,28 @@ function Get-ADGroupUserInfo {
 
         # $value = Get-ADGroupMember -Identity $Group -Recursive -Server $Server
        # This works great now, but the ADuser search needs to be more refined to take into account nested groups
-        $adusers = get-aduser -LDAPFilter "(memberof=$GroupDN)" -Server $Server -Properties mail    
+        #$adusers = get-aduser -LDAPFilter "(memberof=$GroupDN)" -Server $Server -Properties mail    
+
+
+<# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
+operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
+
+Using it in this case, allows for checking members of all nested groups
+
+        # Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail
+        # https://docs.microsoft.com/en-us/windows/win32/adsi/search-filter-syntax?redirectedfrom=MSDN
+
+To check for enabled, disabled and expiring users, check the UserAccountControl attribute:
+* 514 = Disabled Account
+* 512 = Enabled Account (normal account)
+* 16 = locked out
+* 
+
+#>
+        $adusers = Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail,objectsid,department,accountexpires,givenname,UserAccountControl
+        #$adusers = get-aduser -LDAPFilter "(memberof=$GroupDN)" -Server $Server -Properties mail
         $gsusers = Get-GSUser -filter *
+
 
         $combined = foreach ($aditem in $adusers) {
 
@@ -37,10 +57,10 @@ function Get-ADGroupUserInfo {
         
                 if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
                     [PSCustomObject]@{
-                        ADSID = $aditem.sid.value
+                        ADSID = $aditem.objectsid
                         ADmail = $aditem.mail
                         ADFirstName = $aditem.GivenName
-                        ADLastName = $aditem.surname
+                        ADLastName = $aditem.name -replace "$($aditem.givenname) " # This causes an issue with partner account names, investigate how to do it better!
                         GSID = $gsitem.Id
                         GSmail = $gsitem.user
                         GSFirstName = $gsitem.name.GivenName
@@ -58,10 +78,10 @@ function Get-ADGroupUserInfo {
             # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
             if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
                 [PSCustomObject]@{
-                    ADSID = $aditem.sid.value
+                    ADSID = $aditem.objectsid
                     ADmail = $aditem.mail
                     ADFirstName = $aditem.GivenName
-                    ADLastName = $aditem.surname
+                    ADLastName = $aditem.name -replace "$($aditem.givenname) "
                 }
             }
         
@@ -80,7 +100,10 @@ function Get-ADGroupUserInfo {
         
         }
 
+        # Temp, should actually return a 'default' view.
         return $combined + $different1 + $different2
+
+
 
     } #process
 } #function
