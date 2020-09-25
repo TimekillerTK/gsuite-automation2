@@ -25,7 +25,6 @@ function Get-ADGroupUserInfo {
     PROCESS {
 
         # $value = Get-ADGroupMember -Identity $Group -Recursive -Server $Server
-        
        # This works great now, but the ADuser search needs to be more refined to take into account nested groups
         $adusers = get-aduser -LDAPFilter "(memberof=$GroupDN)" -Server $Server -Properties mail    
         $gsusers = Get-GSUser -filter *
@@ -34,6 +33,7 @@ function Get-ADGroupUserInfo {
 
             # Check each item in $gsusers for GSFirstName/GSLastName
             foreach ($gsitem in $gsusers){
+
         
                 if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
                     [PSCustomObject]@{
