@@ -3,13 +3,13 @@
 function Get-MatchingUsers {
     <#
     .SYNOPSIS
-    Fo
+    For fetching a list of GSuite and AD Users and matching them up
     
     .DESCRIPTION
-    Get-ADGroupMember fetches AD group members, however with very limited information, this function will fetch specific properties of AD group members
+    For fetching a list of GSuite and AD Users and matching them up
     
     .EXAMPLE
-    An example
+    Get-MatchingUsers -GroupDN "CN=Group"
     
     .NOTES
     General notes
