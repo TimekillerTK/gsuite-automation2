@@ -17,80 +17,70 @@ function Get-ADGroupUserInfo {
     #>
     [CmdletBinding()]
     param (
-        [string]$Group,
+        [string]$GroupDN,
         [string[]]$Attributes,
         [string]$Server
     )
 
     PROCESS {
 
-        $value = Get-ADGroupMember -Identity $Group -Recursive -Server $Server
+        # $value = Get-ADGroupMember -Identity $Group -Recursive -Server $Server
         
-        # Spaghetti code below, which will need to be untangled and incorporated tomorrow:
-        $list1 = For ($i = 0; $i -lt 15; $i++ ) {
-            [pscustomobject]@{
-                Email = "$i@something.com"
-                HairColor = "blue","yellow","purple" | Get-Random
-                EyeColor = "yellow","blue","indigo" | Get-Random
-            }
-        }
+       # This works great now, but the ADuser search needs to be more refined to take into account nested groups
+        $adusers = get-aduser -LDAPFilter "(memberof=$GroupDN)" -Server $Server -Properties mail    
+        $gsusers = Get-GSUser -filter *
+
+        $combined = foreach ($aditem in $adusers) {
+
+            # Check each item in $gsusers for GSFirstName/GSLastName
+            foreach ($gsitem in $gsusers){
         
-        $list2 = For ($i = 0; $i -lt 20; $i++ ) {
-            [pscustomobject]@{
-                Email = "$i@something.com"
-                Height = Get-Random -Minimum 100 -Maximum 220
-                Weight = Get-Random -Minimum 40 -Maximum 150
-            }
-        }
-        
-        $list1 = Import-Csv -Path .\csv\list1.csv
-        $list2 = Import-Csv -Path .\csv\list2.csv
-        
-        # Check each item in $list1 for Hair/Eye color
-        $combined = foreach ($item1 in $list1) {
-        
-            # Check each item in $list2 for Height/Weight
-            foreach ($item2 in $list2){
-        
-                if ($item2.Email -eq $item1.Email){
+                if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
                     [PSCustomObject]@{
-                        Email = $item1.Email
-                        HairColor = $item1.HairColor
-                        EyeColor = $item1.EyeColor
-                        Height = $item2.Height
-                        Weight = $item2.Weight
+                        ADSID = $aditem.sid.value
+                        ADmail = $aditem.mail
+                        ADFirstName = $aditem.GivenName
+                        ADLastName = $aditem.surname
+                        GSID = $gsitem.Id
+                        GSmail = $gsitem.user
+                        GSFirstName = $gsitem.name.GivenName
+                        GSLastName = $gsitem.name.FamilyName
                     }
                 } 
         
             }
         
-        
         }
-        $different1 = foreach ($item1 in $list1) {
+
+    
+        $different1 = foreach ($aditem in $adusers) {
         
-            if (!($item1.Email -in $list2.Email)){
+            # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
+            if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
                 [PSCustomObject]@{
-                    Email = $item1.Email
-                    HairColor = $item1.HairColor
-                    EyeColor = $item1.EyeColor
+                    ADSID = $aditem.sid.value
+                    ADmail = $aditem.mail
+                    ADFirstName = $aditem.GivenName
+                    ADLastName = $aditem.surname
                 }
             }
         
         }
         
-        $different2 = foreach ($item2 in $list2) {
+        $different2 = foreach ($gsitem in $gsusers) {
         
-            if (!($item2.Email -in $list1.Email)){
+            if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
                 [PSCustomObject]@{
-                    Email = $item2.Email
-                    Height = $item2.Height
-                    Weight = $item2.Weight
+                    GSID = $gsitem.Id
+                    GSmail = $gsitem.user
+                    GSFirstName = $gsitem.name.GivenName
+                    GSLastName = $gsitem.name.FamilyName
                 }
             }
         
         }
-        
-        $total = $combined + $different1 + $different2
+
+        return $combined + $different1 + $different2
 
     } #process
 } #function
