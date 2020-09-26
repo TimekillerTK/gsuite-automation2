@@ -1,5 +1,42 @@
 #Requires -Modules PSGsuite,ActiveDirectory
 
+# Mail sending function
+function SendMail {
+  
+    # $smtpServer needs to be added
+    # $MailBody needs to be added
+    # $MailFrom needs to be added
+    # $MailTo needs to be added
+    # $subj needs to be added 
+    
+    $SMTPClient=New-Object System.Net.Mail.smtpClient
+    $SMTPClient.host=$smtpServer
+    $SMTPClient.EnableSSL=$true
+    $SMTPClient.UseDefaultCredentials=$true
+    
+    
+    $MailMessage=New-Object System.Net.Mail.MailMessage
+    $MailMessage.Priority= $([System.Net.Mail.MailPriority]::High)
+    $MailMessage.From=$MailFrom
+    $MailMessage.To.Add($MailTo)
+    
+    $MailMessage.Subject=$subj
+    $MailMessage.IsBodyHtml=$true
+    $MailMessage.BodyEncoding= $([System.Text.Encoding]::UTF8)
+    $MailMessage.Body=$MailBody
+    $SMTPClient.Send($MailMessage)
+  
+  }
+  
+  # Logging function
+  Function LogWrite
+  {
+    Param ([string]$logstring)
+    # $logfile needs to be added
+    Add-Content $logfile -value $logstring
+  }
+
+
 function Get-MatchingUsers {
     <#
     .SYNOPSIS
