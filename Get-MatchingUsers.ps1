@@ -59,6 +59,12 @@ function Get-MatchingUsers {
     )
 
     PROCESS {
+    
+    # CAn't get this automatic variable to work for some reason. Try tomorrow.
+    Write-Verbose "Here's info for myinvocation: $myinvocation"
+    Write-Verbose "Here's info for PSScriptroot: $($myinvocation.PSScriptRoot)"
+    Write-Verbose "Here't info for pscommandpath: $($myinvocation.PSCommandPath)"
+    #Start-Transcript -Path .\logs\log_$(Get-Date -Format 'dd-MM-yyyy').txt -NoClobber
 
 <# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
 operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
