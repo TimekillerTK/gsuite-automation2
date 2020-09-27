@@ -29,12 +29,12 @@ function SendMail {
   }
   
   # Logging function
-  Function LogWrite
-  {
+  Function LogWrite {
     Param ([string]$logstring)
     # $logfile needs to be added
     Add-Content $logfile -value $logstring
   }
+
 
 
 function Get-MatchingUsers {
@@ -53,9 +53,9 @@ function Get-MatchingUsers {
     #>
     [CmdletBinding()]
     param (
-        [string]$GroupDN,
+        [Parameter(Mandatory=$true)][string]$GroupDN,
         #[string[]]$Attributes,
-        [string]$Server
+        [Parameter(Mandatory=$true)][string]$Server
     )
 
     PROCESS {
@@ -76,10 +76,13 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
         # First we need to gather information from both AD and GSuite about current users
+        Write-Verbose "=== Querying AD for group $GroupDN for server $server"
         $adusers = Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail,objectsid,department,accountexpires,givenname,UserAccountControl
+        Write-Verbose "=== Querying GSuite for users"
         $gsusers = Get-GSUser -filter *
 
         # Checking for ADUsers that are have already been added to GSuite
+        Write-Verbose '=== Looping through $adusers and $gsusers to find commont items'
         $combined = foreach ($aditem in $adusers) {
 
            
@@ -94,6 +97,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     $lastname = $lastname -replace "\(Blitz\)"
                     $lastname = $lastname -replace "[0-9]$"
 
+                    Write-Verbose "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)"
                     # Creating the Object
                     [PSCustomObject]@{
                         ADSID = $aditem.objectsid
@@ -113,6 +117,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         }
 
         # Checks for AD users which have not been added to GSuite yet
+        Write-Verbose '=== Looping through $adusers and $gsusers to find items only found in $adusers'
         $different1 = foreach ($aditem in $adusers) {
         
             # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
@@ -124,6 +129,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                 $lastname = $lastname -replace "\(Blitz\)"
                 $lastname = $lastname -replace "[0-9]$"            
                 
+                Write-Verbose "Creating PSObject: $($aditem.mail) with no match"
                 # Creating the Object
                 [PSCustomObject]@{
                     ADSID = $aditem.objectsid
@@ -137,10 +143,13 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         }
         
         # Checks for GSuite users that do not have a corresponding AD User account
+        Write-Verbose '=== Looping through $adusers and $gsusers to find items only found in $gsusers'
         $different2 = foreach ($gsitem in $gsusers) {
         
             # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
             if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
+
+                Write-Verbose "Creating PSObject: $($gsitem.user) with no match"
                 # Creating the Object
                 [PSCustomObject]@{
                     GSID = $gsitem.Id
