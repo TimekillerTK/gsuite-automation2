@@ -26,19 +26,37 @@ function SendMail {
     $MailMessage.Body=$MailBody
     $SMTPClient.Send($MailMessage)
   
-  }
+}
   
-  # Logging function
-  Function LogWrite {
-    Param ([string]$logstring)
-    # 'dd-MM-yyyy HH.mm.ss' - problem with this is that the log doesn't insert into the correct file because 
-    # a new one gets created every second, need to get script execution time or maybe get the variable from Start-Transcript 
-    # At the start of the script
-    $logfile = ".\logs\pwsh_log_$([string](Get-Date -Format 'dd-MM-yyyy HH.mm.ss')).log"
+function Get-TimeStamp {
+    
+    #return "[{dd/MM/yy} {HH:mm:ss}]" -f (Get-Date)
+    get-date -Format "MM-dd-yy HH-mm-ss"
+    
+}
+
+  # Logging function, requires Get-TimeStamp
+Function LogWrite {
+    Param (
+        [string]$LogString,
+        [string]$Time
+        )
+
+    # Checks if the time parameter is present or not
+    If ($PSBoundParameters.ContainsKey('Time')) {
+        $logfile = ".\logs\logfile $([string]($time)).log"
+    } else {
+        $logfile = ".\logs\logfile.log"
+    }
+
+    # Set a timestamp
+    $checktime = get-date -Format "[MM/dd/yy HH:mm:ss] "
+    $logstring = $checktime + $logstring
+
+    # Command outputs both to Verbose pipeline as well as to a file
     Write-Verbose $logstring
-    Write-Verbose $myinvocation.mycommand.name
     Add-Content $logfile -value $logstring
-  }
+}
 
 
 
@@ -64,11 +82,8 @@ function Get-MatchingUsers {
 
     PROCESS {
     
-    # CAn't get this automatic variable to work for some reason. Try tomorrow.
-    # LogWrite "Here's info for myinvocation: $myinvocation"
-    # LogWrite "Here's info for PSScriptroot: $($myinvocation.PSScriptRoot)"
-    # LogWrite "Here't info for pscommandpath: $($myinvocation.PSCommandPath)"
-    #Start-Transcript -Path .\logs\log_$(Get-Date -Format 'dd-MM-yyyy').txt -NoClobber
+        # For logging, setting a variable for LogWrite with a certain date
+        $timevar = Get-Date -Format "MM-dd-yy HH-mm-ss"
 
 <# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
 operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
@@ -87,7 +102,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 #>
         # First we need to gather information from both AD and GSuite about current users
         # LogWrite "=== Querying AD for group $GroupDN for server $server"
-        LogWrite "=== Querying AD for group $GroupDN for server $server"
+        LogWrite "=== Querying AD for group $GroupDN for server $server" -Time $timevar
 
         $params = @{
             Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
@@ -97,11 +112,11 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         $adusers = Get-ADObject @params
 
         #$adusers = Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail,objectsid,department,accountexpires,givenname,UserAccountControl
-        LogWrite "=== Querying GSuite for users"
+        LogWrite "=== Querying GSuite for users" -Time $timevar
         $gsusers = Get-GSUser -filter *
 
         # Checking for ADUsers that are have already been added to GSuite
-        LogWrite '=== Looping through $adusers and $gsusers to find commont items'
+        LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
         $combined = foreach ($aditem in $adusers) {
 
            
@@ -116,7 +131,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     $lastname = $lastname -replace "\(Blitz\)"
                     $lastname = $lastname -replace "[0-9]$"
 
-                    LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)"
+                    LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)" -Time $timevar
                     # Creating the Object
                     [PSCustomObject]@{
                         ADSID = $aditem.objectsid
@@ -136,7 +151,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         }
 
         # Checks for AD users which have not been added to GSuite yet
-        LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers'
+        LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
         $different1 = foreach ($aditem in $adusers) {
         
             # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
@@ -148,7 +163,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                 $lastname = $lastname -replace "\(Blitz\)"
                 $lastname = $lastname -replace "[0-9]$"            
                 
-                LogWrite "Creating PSObject: $($aditem.mail) with no match"
+                LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
                 # Creating the Object
                 [PSCustomObject]@{
                     ADSID = $aditem.objectsid
@@ -162,13 +177,13 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         }
         
         # Checks for GSuite users that do not have a corresponding AD User account
-        LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers'
+        LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
         $different2 = foreach ($gsitem in $gsusers) {
         
             # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
             if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
 
-                LogWrite "Creating PSObject: $($gsitem.user) with no match"
+                LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
                 # Creating the Object
                 [PSCustomObject]@{
                     GSID = $gsitem.Id
@@ -202,9 +217,3 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 
     } #process
 } #function
-
-function Somethingsomething {
-    $val = $myinvocation.mycommand
-    $val
-}
-
