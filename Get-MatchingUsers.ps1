@@ -82,7 +82,7 @@ function Get-MatchingUsers {
 
     PROCESS {
     
-        # For logging, setting a variable for LogWrite with a certain date
+        # For logging, setting a variable for LogWrite with a certain date test
         $timevar = Get-Date -Format "MM-dd-yy HH-mm-ss"
 
 <# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
