@@ -2,13 +2,31 @@
 
 # Mail sending function
 function SendMail {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]
+        $SmtpServer,
+        
+        [Parameter(Mandatory=$true)]
+        [string]
+        $MailBody,
+
+        [Parameter(Mandatory=$true)]
+        [string]
+        $MailFrom,
+
+        [Parameter(Mandatory=$true)]
+        [string]
+        $MailTo,
+
+        [Parameter(Mandatory=$true)]
+        [string]
+        $Subject
+        
+    )
   
-    # $smtpServer needs to be added
-    # $MailBody needs to be added
-    # $MailFrom needs to be added
-    # $MailTo needs to be added
-    # $subj needs to be added 
-    
+
     $SMTPClient=New-Object System.Net.Mail.smtpClient
     $SMTPClient.host=$smtpServer
     $SMTPClient.EnableSSL=$true
@@ -20,7 +38,7 @@ function SendMail {
     $MailMessage.From=$MailFrom
     $MailMessage.To.Add($MailTo)
     
-    $MailMessage.Subject=$subj
+    $MailMessage.Subject=$Subject
     $MailMessage.IsBodyHtml=$true
     $MailMessage.BodyEncoding= $([System.Text.Encoding]::UTF8)
     $MailMessage.Body=$MailBody
