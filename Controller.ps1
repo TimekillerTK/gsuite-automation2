@@ -18,7 +18,7 @@ $domain (mail domain for GSuite Server)
 #>
 
 # The following below is unfortunately required for the LogWrite function to work properly
-$timevar = Get-Date -Format "MM-dd-yy HH-mm-ss"
+$timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
 LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Time $timevar
 $params = @{
@@ -67,3 +67,23 @@ If ($newusers -eq $null) {
         } #catch
     } #foreach
 } #else
+
+# Compress files here
+$archiveparams = @{
+    Path = '.\logs\*.log'
+    DestinationPath = ".\Logs_$($timevar).zip"
+}
+Compress-Archive @archiveparams
+
+# Send files
+<#
+The below should probably be stored in a file
+$params = @{
+    Smtpserver = 
+}
+#> 
+
+
+# Delete items after sending is successful! 
+Remove-Item -Path $archiveparams.DestinationPath
+Remove-Item -Path $archiveparams.Path

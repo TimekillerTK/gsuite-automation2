@@ -4,13 +4,10 @@
 function SendMail {
     [CmdletBinding()]
     param (
+        # Smtp server that will send the message
         [Parameter(Mandatory=$true)]
         [string]
         $SmtpServer,
-        
-        [Parameter(Mandatory=$true)]
-        [string]
-        $MailBody,
 
         [Parameter(Mandatory=$true)]
         [string]
@@ -20,9 +17,20 @@ function SendMail {
         [string]
         $MailTo,
 
-        [Parameter(Mandatory=$true)]
+        # Body of the mail, optional.
+        [Parameter()]
         [string]
-        $Subject
+        $MailBody,
+
+        # Sets the E-mail subject line
+        [Parameter()]
+        [string]
+        $Subject = "GSuite script run $(get-date -Format 'dd-MM-yyyy HH:mm:ss')",
+
+        # Sets the E-mail priority
+        [Parameter()]
+        [string]
+        $Priority = "Normal"
         
     )
   
@@ -34,7 +42,7 @@ function SendMail {
     
     
     $MailMessage=New-Object System.Net.Mail.MailMessage
-    $MailMessage.Priority= $([System.Net.Mail.MailPriority]::High)
+    $MailMessage.Priority= $([System.Net.Mail.MailPriority]::$Priority)
     $MailMessage.From=$MailFrom
     $MailMessage.To.Add($MailTo)
     
