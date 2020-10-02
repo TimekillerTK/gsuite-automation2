@@ -9,8 +9,7 @@ function SendMail {
         [string]
         $SmtpServer,
 
-        [Parameter(Mandatory=$true,
-                   ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true)]
         [string]
         $MailFrom,
 
@@ -59,15 +58,9 @@ function SendMail {
     $SMTPClient.Send($MailMessage)
   
 }
-  
-function Get-TimeStamp {
-    
-    #return "[{dd/MM/yy} {HH:mm:ss}]" -f (Get-Date)
-    get-date -Format "MM-dd-yy HH-mm-ss"
-    
-}
 
-  # Logging function, requires Get-TimeStamp
+
+# Logging function
 Function LogWrite {
     Param (
         [string]$LogString,
@@ -76,13 +69,13 @@ Function LogWrite {
 
     # Checks if the time parameter is present or not
     If ($PSBoundParameters.ContainsKey('Time')) {
-        $logfile = ".\logs\logfile $([string]($time)).log"
+        $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile $([string]($time)).log"
     } else {
-        $logfile = ".\logs\logfile.log"
+        $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile.log"
     }
 
     # Set a timestamp
-    $checktime = get-date -Format "[MM/dd/yy HH:mm:ss] "
+    $checktime = get-date -Format "[dd/MM/yy HH:mm:ss] "
     $logstring = $checktime + $logstring
 
     # Command outputs both to Verbose pipeline as well as to a file
@@ -115,7 +108,7 @@ function Get-MatchingUsers {
     PROCESS {
     
         # For logging, setting a variable for LogWrite with a certain date test
-        $timevar = Get-Date -Format "MM-dd-yy HH-mm-ss"
+        $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
 <# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
 operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
