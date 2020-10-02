@@ -1,5 +1,5 @@
 #Requires -Modules GSuiteAutomation
-
+Import-Module GsuiteAutomation -Force
 # Controller script for the process
 <#
 1. Use Get-MatchingUsers function to get a dump of info and store it in a variable $dump
@@ -20,10 +20,13 @@ $domain (mail domain for GSuite Server)
 # The following below is unfortunately required for the LogWrite function to work properly
 $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
+# Import group from file
+$import = Import-csv C:\Script\gsuiteautomation-vars.csv
+
 LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Time $timevar
 $params = @{
-    GroupDN = (Get-ADGroup $group).distinguishedname
-    Server = $server
+    GroupDN = (Get-ADGroup $import.group).distinguishedname
+    Server = $import.server
     Verbose = $true
 }
 
@@ -32,10 +35,11 @@ $params = @{
 $dump = Get-MatchingUsers @params
 $newusers = $dump | Where-Object {($_.admail -ne $null) -and ($_.gsmail -eq $null)} 
 
-# Checks if the $newusers is null
+# Checks if no new users need to be added
 If ($newusers -eq $null) {
+
     LogWrite ">> Controller: No new users needed" -Time $timevar
-    #Send empty mail informing the script ran but didn't create any new users
+
 } else {
     LogWrite ">> Controller: New GSuite users needed... Creating new users" -Time $timevar
     foreach ($user in $newusers) {
@@ -48,7 +52,7 @@ If ($newusers -eq $null) {
                 GivenName = $user.adfirstname
                 FamilyName = $user.adlastname
                 Password = ConvertTo-SecureString -String "$(get-random -Minimum 9999999999999)" -AsPlainText -force
-                ErrorAction = Stop
+                ErrorAction = 'Stop'
             }
             
             LogWrite ">> Controller: Creating user $($user.admail)" -Time $timevar
@@ -61,13 +65,14 @@ If ($newusers -eq $null) {
         } #try
         catch {
 
-            $mailsubject = "Failed"
+            $mailsubject = "Fail"
             $mailpriority = "High"
             
         } #catch
     } #foreach
 } #else
 
+LogWrite ">> Controller: Archiving log files..." -Time $timevar
 # Compress files here
 $archiveparams = @{
     Path = '.\logs\*.log'
@@ -75,15 +80,31 @@ $archiveparams = @{
 }
 Compress-Archive @archiveparams
 
-# Send files
-<#
-The below should probably be stored in a file
-$params = @{
-    Smtpserver = 
+
+LogWrite ">> Controller: Sending mail about job status: $mailsubject" -Time $timevar
+# This var stores the SMTP/MailFrom/MailTo values
+$params = Import-csv 'C:\Script\gsuiteautomation-mailvars.csv'
+$params | Add-Member -MemberType NoteProperty `
+                  -Name 'Priority' `
+                  -Value $mailpriority
+$params | Add-Member -MemberType NoteProperty `
+                  -Name 'Subject' `
+                  -Value $mailsubject
+$params | Add-Member -MemberType NoteProperty `
+                  -Name 'AttachmentPath' `
+                  -Value $archiveparams.DestinationPath
+
+# Converting to Hashtable for Splatting, check if there's a better way to do this later.
+$hashtable = @{}
+foreach( $property in $params.psobject.properties.name )
+{
+    $hashtable[$property] = $params.$property
 }
-#> 
+
+SendMail @hashtable
 
 
+LogWrite ">> Controller: Cleaning up files..." -Time $timevar
 # Delete items after sending is successful! 
 Remove-Item -Path $archiveparams.DestinationPath
 Remove-Item -Path $archiveparams.Path

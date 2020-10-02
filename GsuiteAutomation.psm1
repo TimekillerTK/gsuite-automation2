@@ -9,7 +9,8 @@ function SendMail {
         [string]
         $SmtpServer,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory=$true,
+                   ValueFromPipelineByPropertyName=$true)]
         [string]
         $MailFrom,
 
@@ -30,7 +31,11 @@ function SendMail {
         # Sets the E-mail priority
         [Parameter()]
         [string]
-        $Priority = "Normal"
+        $Priority = "Normal",
+
+        [Parameter()]
+        [string]
+        $AttachmentPath      
         
     )
   
@@ -50,6 +55,7 @@ function SendMail {
     $MailMessage.IsBodyHtml=$true
     $MailMessage.BodyEncoding= $([System.Text.Encoding]::UTF8)
     $MailMessage.Body=$MailBody
+    $MailMessage.Attachments.Add($AttachmentPath)
     $SMTPClient.Send($MailMessage)
   
 }
