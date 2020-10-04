@@ -15,6 +15,12 @@ VARS THAT NEED TO BE INPUT:
 $server (DC)
 $group (DistinguishedName)
 $domain (mail domain for GSuite Server)
+
+Ideas for logging:
+* Should be logged to a generic log file, which is then renamed to the timestamped one at the very end.
+
+More illustrations:
+* 
 #>
 
 # The following below is unfortunately required for the LogWrite function to work properly
@@ -113,14 +119,15 @@ SendMail @hashtable
 
 
 LogWrite ">> Controller: Cleaning up files..." -Time $timevar
+
 # Delete items after sending is successful!
 # This errors out because the mail process is still using the file at this point which can't be deleted until the message is sent
 # Will retry 5 times, then stop 
-
 $archiveparams.DestinationPath, $archiveparams.Path | ForEach-Object {
 
     do {
 
+        # Mail process may not be finished sending mail yet at this point, therefore try/catch
         try {
 
             LogWrite ">> Controller: Attempting to delete files in path $_" -Time $timevar
