@@ -242,11 +242,11 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 
     } #process
 } #function
-<#
+
+
 function New-MatchingUser {
     param (
         
     )
     
 }
-#>
