@@ -92,6 +92,7 @@ function Get-MatchingUsers {
     
     .DESCRIPTION
     For fetching a list of GSuite and AD Users and matching them up
+
     
     .EXAMPLE
     Get-MatchingUsers -GroupDN "CN=Group" -Server
@@ -104,7 +105,7 @@ function Get-MatchingUsers {
         [Parameter(Mandatory=$true)][string]$GroupDN,
         [Parameter(ValueFromPipeline=$true)][string]$Server = $(Get-ADDomainController),
         [ValidateSet("All","ADDiff","GSDiff")]
-        [string]$Value = "All"
+        [string]$Scope = "All"
     )
 
     PROCESS {
@@ -127,8 +128,16 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 * 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
+
+        # This is broken, returns the default, investigate why
+        switch ($PSBoundParameters.Scope) {
+            All { LogWrite "All is selected" }
+            ADDiff { LogWrite "ADDiff is selected" }
+            GSDiff { LogWrite "GSdiff is selected" }
+            Default { LogWrite "NONE!!!"}
+        }
+
         # First we need to gather information from both AD and GSuite about current users
-        # LogWrite "=== Querying AD for group $GroupDN for server $server"
         LogWrite "=== Querying AD for group $GroupDN for server $server" -Time $timevar
 
         $params = @{
