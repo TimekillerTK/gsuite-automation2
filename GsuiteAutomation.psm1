@@ -94,7 +94,7 @@ function Get-MatchingUsers {
     For fetching a list of GSuite and AD Users and matching them up
     
     .EXAMPLE
-    Get-MatchingUsers -GroupDN "CN=Group"
+    Get-MatchingUsers -GroupDN "CN=Group" -Server
     
     .NOTES
     General notes
@@ -102,7 +102,9 @@ function Get-MatchingUsers {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][string]$GroupDN,
-        [Parameter(Mandatory=$true)][string]$Server
+        [Parameter(ValueFromPipeline=$true)][string]$Server = $(Get-ADDomainController),
+        [ValidateSet("All","ADDiff","GSDiff")]
+        [string]$Value = "All"
     )
 
     PROCESS {

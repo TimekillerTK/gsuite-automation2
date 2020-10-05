@@ -1,5 +1,5 @@
 #Requires -Modules GSuiteAutomation
-Import-Module GsuiteAutomation -Force
+#Import-Module GsuiteAutomation -Force
 # Controller script for the process
 <#
 1. Use Get-MatchingUsers function to get a dump of info and store it in a variable $dump
