@@ -83,7 +83,34 @@ Function LogWrite {
     Add-Content $logfile -value $logstring
 }
 
+# Function for creating the object in Get-MatchingUsers
+function OutputObject {
+    param (
+        $GSID,
+        $GSMail,
+        $GSFirstName,
+        $GSLastName,
+        $ADSID,
+        $ADmail,
+        $ADFirstName,
+        $ADLastName,
+        $ADEnabled
+    )
 
+    $object = [PSCustomObject]@{
+        ADSID = $ADSID
+        ADmail = $ADmail
+        ADFirstName = $ADFirstName
+        ADLastName = $ADLastName
+        ADEnabled = $ADEnabled
+        GSID = $GSID
+        GSmail = $GSmail
+        GSFirstName = $GSFirstName
+        GSLastName = $GSLastName
+    }
+    return $object
+
+}
 
 function Get-MatchingUsers {
     <#
@@ -93,7 +120,6 @@ function Get-MatchingUsers {
     .DESCRIPTION
     For fetching a list of GSuite and AD Users and matching them up
 
-    
     .EXAMPLE
     Get-MatchingUsers -GroupDN "CN=Group" -Server
     
@@ -102,10 +128,11 @@ function Get-MatchingUsers {
     #>
     [CmdletBinding()]
     param (
+
         [Parameter(Mandatory=$true)][string]$GroupDN,
         [Parameter(ValueFromPipeline=$true)][string]$Server = $(Get-ADDomainController),
-        [ValidateSet("All","ADDiff","GSDiff")]
-        [string]$Scope = "All"
+        [ValidateSet("All","ADDiff","GSDiff")][string]$Scope = "All"
+
     )
 
     PROCESS {
@@ -129,14 +156,6 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
 
-        # Working with $Scope, here's where most of everything will happen, need functions to make it more logical
-        switch ($Scope) {
-            All { LogWrite "All is selected" }
-            ADDiff { LogWrite "ADDiff is selected" }
-            GSDiff { LogWrite "GSdiff is selected" }
-            Default { LogWrite "NONE!!!"}
-        }
-
         # First we need to gather information from both AD and GSuite about current users
         LogWrite "=== Querying AD for group $GroupDN for server $server" -Time $timevar
 
@@ -151,6 +170,97 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         LogWrite "=== Querying GSuite for users" -Time $timevar
         $gsusers = Get-GSUser -filter *
 
+
+        # Working with $Scope, here's where most of everything will happen, need functions to make it more logical
+        switch ($Scope) {
+            All { 
+                
+                LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
+                foreach ($aditem in $adusers) {
+                    foreach ($gsitem in $gsusers) {
+                        if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
+
+                            $lastname = $aditem.Name -replace "$($aditem.GivenName) "
+                            $lastname = $lastname -replace "\[Partner\] "
+                            $lastname = $lastname -replace "\(Blitz\)"
+                            $lastname = $lastname -replace "[0-9]$"   
+                            
+                            LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)" -Time $timevar
+                        
+                            $params1 = @{
+                                ADSID = $aditem.objectsid
+                                ADmail = $aditem.mail
+                                ADFirstName = $aditem.GivenName
+                                ADLastName = $lastname
+                                ADEnabled = $aditem.UserAccountControl
+                                GSID = $gsitem.Id
+                                GSmail = $gsitem.user
+                                GSFirstName = $gsitem.name.GivenName
+                                GSLastName = $gsitem.name.FamilyName
+                            }
+                            $combined = OutputObject @params1
+                            
+                            
+                        } #if
+                    } #foreach
+                } #foreach
+
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
+                foreach ($aditem in $adusers) {
+        
+                    # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
+                    if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
+        
+                        # Bandaid to fix some random user inserts, should be fed via parameter
+                        $lastname = $aditem.Name -replace "$($aditem.GivenName) "
+                        $lastname = $lastname -replace "\[Partner\] "
+                        $lastname = $lastname -replace "\(Blitz\)"
+                        $lastname = $lastname -replace "[0-9]$"            
+                        
+                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
+                        # Creating the Object
+                        $params2 = @{
+                            ADSID = $aditem.objectsid
+                            ADmail = $aditem.mail
+                            ADFirstName = $aditem.GivenName
+                            ADLastName = $lastname
+                            ADEnabled = $aditem.UserAccountControl
+                        }
+                        $different1 = OutputObject @params2
+                    }
+                
+                }
+
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
+                foreach ($gsitem in $gsusers) {
+        
+                    # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
+                    if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
+        
+                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
+                        # Creating the Object
+                        $params3 = @{
+                            GSID = $gsitem.Id
+                            GSmail = $gsitem.user
+                            GSFirstName = $gsitem.name.GivenName
+                            GSLastName = $gsitem.name.FamilyName
+                        }
+                        $different2 = OutputObject @params3
+                    }
+                
+                }
+
+                # Combining everything
+                $total = $combined + $different1 + $different2
+                return $total
+
+                
+            } #ALL
+            ADDiff { LogWrite "ADDiff is selected" }
+            GSDiff { LogWrite "GSdiff is selected" }
+            Default { LogWrite "NONE!!!"}
+        }
+<#
         # Checking for ADUsers that are have already been added to GSuite
         LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
         $combined = foreach ($aditem in $adusers) {
@@ -180,11 +290,11 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                         GSFirstName = $gsitem.name.GivenName
                         GSLastName = $gsitem.name.FamilyName
                     }
-                } 
+                } #if
         
-            }
+            } #foreach
         
-        }
+        } #foreach
 
         # Checks for AD users which have not been added to GSuite yet
         LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
@@ -250,59 +360,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         $total | Add-Member MemberSet PSStandardMembers $members
         $total
 
-
+#>
     } #process
 } #function
 
-
-# Function for creating new users, may or may not be necessary
-function New-MatchingUser {
-    param (
-        
-    )
-    
-}
-
-
-#region Put example values here for testing
-$params = @{
-    Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
-    Server = $Server
-    Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl"
-}
-$adusers = Get-ADObject @params
-
-$gsusers = Get-GSUser -filter *
-#endregion
-
-function GSObjectValues {
-
-}
-function ADObjectValues {
-    
-}
-
-function AllObjectValues {
-    # Add member here
-}
-
-function StoreCustomObject {
-
-        # Bandaid to fix some random user inserts, should be fed via parameter later on
-        $lastname = $aditem.Name -replace "$($aditem.GivenName) "
-        $lastname = $lastname -replace "\[Partner\] "
-        $lastname = $lastname -replace "\(Blitz\)"
-        $lastname = $lastname -replace "[0-9]$"
-
-        $CustomObject = [PSCustomObject]@{}
-
-}
-
-switch ($Scope) {
-    All { 
-
-    }
-    ADDiff { LogWrite "ADDiff is selected" }
-    GSDiff { LogWrite "GSdiff is selected" }
-    Default { LogWrite "NONE!!!"}
-}
