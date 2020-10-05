@@ -129,8 +129,8 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
 
-        # This is broken, returns the default, investigate why
-        switch ($PSBoundParameters.Scope) {
+        # Working with $Scope, here's where most of everything will happen, need functions to make it more logical
+        switch ($Scope) {
             All { LogWrite "All is selected" }
             ADDiff { LogWrite "ADDiff is selected" }
             GSDiff { LogWrite "GSdiff is selected" }
@@ -255,9 +255,54 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 } #function
 
 
+# Function for creating new users, may or may not be necessary
 function New-MatchingUser {
     param (
         
     )
     
+}
+
+
+#region Put example values here for testing
+$params = @{
+    Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
+    Server = $Server
+    Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl"
+}
+$adusers = Get-ADObject @params
+
+$gsusers = Get-GSUser -filter *
+#endregion
+
+function GSObjectValues {
+
+}
+function ADObjectValues {
+    
+}
+
+function AllObjectValues {
+    # Add member here
+}
+
+function StoreCustomObject {
+
+        # Bandaid to fix some random user inserts, should be fed via parameter later on
+        $lastname = $aditem.Name -replace "$($aditem.GivenName) "
+        $lastname = $lastname -replace "\[Partner\] "
+        $lastname = $lastname -replace "\(Blitz\)"
+        $lastname = $lastname -replace "[0-9]$"
+
+        $CustomObject = [PSCustomObject]@{}
+
+}
+
+switch ($Scope) {
+    All { 
+
+    }
+    ADDiff { LogWrite "ADDiff is selected" }
+    GSDiff { LogWrite "GSdiff is selected" }
+    Default { LogWrite "NONE!!!"}
 }
