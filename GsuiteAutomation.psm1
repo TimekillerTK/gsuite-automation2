@@ -112,6 +112,36 @@ function OutputObject {
 
 }
 
+function FixLastName {
+    [CmdletBinding()]
+    param (
+        [psobject[]]$InputObject,
+        [string[]]$InputRegex
+    )
+
+    foreach ($object in $InputObject) {
+
+        Write-Verbose "=== Object worked on is $($object.name)"
+        $lastname = $object.name -replace $object.GivenName
+        Write-Verbose "=== Lastname with GivenName removed is: $lastname"
+
+        foreach ($regex in $InputRegex) {
+            
+            if ($lastname -match $regex) {
+            
+                Write-Verbose "=== Removing regex $regex"
+                $lastname -replace $regex
+                
+            
+            }
+
+        }
+    
+    }
+    
+
+}
+
 function Get-MatchingUsers {
     <#
     .SYNOPSIS
@@ -176,7 +206,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
             All { 
                 
                 LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
-                foreach ($aditem in $adusers) {
+                $combined = foreach ($aditem in $adusers) {
                     foreach ($gsitem in $gsusers) {
                         if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
 
@@ -198,7 +228,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                                 GSFirstName = $gsitem.name.GivenName
                                 GSLastName = $gsitem.name.FamilyName
                             }
-                            $combined = OutputObject @params1
+                            OutputObject @params1
                             
                             
                         } #if
@@ -206,7 +236,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                 } #foreach
 
                 LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
-                foreach ($aditem in $adusers) {
+                $different1 = foreach ($aditem in $adusers) {
         
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
                     if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
@@ -226,13 +256,13 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                             ADLastName = $lastname
                             ADEnabled = $aditem.UserAccountControl
                         }
-                        $different1 = OutputObject @params2
+                        OutputObject @params2
                     }
                 
                 }
 
                 LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
-                foreach ($gsitem in $gsusers) {
+                $different2 = foreach ($gsitem in $gsusers) {
         
                     # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
                     if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
@@ -245,7 +275,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                             GSFirstName = $gsitem.name.GivenName
                             GSLastName = $gsitem.name.FamilyName
                         }
-                        $different2 = OutputObject @params3
+                        OutputObject @params3
                     }
                 
                 }
