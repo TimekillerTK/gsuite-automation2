@@ -123,14 +123,14 @@ function FixLastName {
     foreach ($object in $InputObject) {
 
         $setvalue = 0
-        Write-Verbose "=== Object worked on is $($object.name)"
+        LogWrite "=== Object worked on is $($object.name)" -Time $timevar
         $lastname = $object.name -replace ($object.GivenName + " ")
-        Write-Verbose "=== Lastname with GivenName removed is: $lastname"
+        LogWrite "=== Lastname with GivenName removed is: $lastname" -Time $timevar
 
         foreach ($regex in $InputRegex) {
             
             if ($lastname -match $regex) {
-                Write-Verbose "=== Removing regex $regex"
+                LogWrite "=== Removing regex $regex" -Time $timevar
                 $lastname = $lastname -replace $regex
                 $lastname = $lastname -replace " "
                 $setvalue = 1
@@ -141,9 +141,9 @@ function FixLastName {
         }
 
         if ($setvalue -eq 1) {
-            Write-Verbose "=== Setvalue is $setvalue, exiting iteration for $($object.name)"
+            LogWrite "=== Setvalue is $setvalue, exiting iteration for $($object.name)" -Time $timevar
         } else {
-            Write-Verbose "=== Outputting with no match: $lastname"
+            LogWrite "=== Outputting with no match: $lastname" -Time $timevar
             $lastname
         }
     
@@ -221,7 +221,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 
                             $params = @{
                                 InputObject = $aditem
-                                InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                                InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
                             }
                             $lastname = FixLastName @params
                             # $lastname = $aditem.Name -replace "$($aditem.GivenName) "
@@ -257,7 +257,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         
                         $params = @{
                             InputObject = $aditem
-                            InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                            InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
                         }
                         $lastname = FixLastName @params
                         # $lastname = $aditem.Name -replace "$($aditem.GivenName) "
