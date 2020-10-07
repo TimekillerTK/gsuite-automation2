@@ -71,7 +71,7 @@ Function LogWrite {
     If ($PSBoundParameters.ContainsKey('Time')) {
         $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile $([string]($time)).log"
     } else {
-        $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile.log"
+        $logfile = "$($MyInvocation.PSScriptRoot)\logfile.log"
     }
 
     # Set a timestamp
@@ -83,7 +83,74 @@ Function LogWrite {
     Add-Content $logfile -value $logstring
 }
 
+# Function for creating the object in Get-MatchingUsers
+function OutputObject {
+    param (
+        $GSID,
+        $GSMail,
+        $GSFirstName,
+        $GSLastName,
+        $ADSID,
+        $ADmail,
+        $ADFirstName,
+        $ADLastName,
+        $ADEnabled
+    )
 
+    $object = [PSCustomObject]@{
+        ADSID = $ADSID
+        ADmail = $ADmail
+        ADFirstName = $ADFirstName
+        ADLastName = $ADLastName
+        ADEnabled = $ADEnabled
+        GSID = $GSID
+        GSmail = $GSmail
+        GSFirstName = $GSFirstName
+        GSLastName = $GSLastName
+    }
+    return $object
+
+}
+
+function FixLastName {
+    [CmdletBinding()]
+    param (
+        [Parameter(ValueFromPipelineByPropertyName=$true)][psobject[]]$InputObject,
+        [string[]]$InputRegex
+    )
+
+
+    foreach ($object in $InputObject) {
+
+        $setvalue = 0
+        LogWrite "=== Object worked on is $($object.name)" -Time $timevar
+        $lastname = $object.name -replace ($object.GivenName + " ")
+        LogWrite "=== Lastname with GivenName removed is: $lastname" -Time $timevar
+
+        foreach ($regex in $InputRegex) {
+            
+            if ($lastname -match $regex) {
+                LogWrite "=== Removing regex $regex" -Time $timevar
+                $lastname = $lastname -replace $regex
+                $lastname = $lastname -replace " "
+                $setvalue = 1
+                $lastname
+                LogWrite "Outputting with regex match: $lastname"
+                
+            } 
+            
+        }
+
+        if ($setvalue -eq 1) {
+            LogWrite "=== Setvalue is $setvalue, exiting iteration for $($object.name)" -Time $timevar
+        } else {
+            LogWrite "=== Outputting with no match: $lastname" -Time $timevar
+            $lastname
+        }
+    
+    }
+
+}
 
 function Get-MatchingUsers {
     <#
@@ -92,17 +159,20 @@ function Get-MatchingUsers {
     
     .DESCRIPTION
     For fetching a list of GSuite and AD Users and matching them up
-    
+
     .EXAMPLE
-    Get-MatchingUsers -GroupDN "CN=Group"
+    Get-MatchingUsers -GroupDN "CN=Group" -Server
     
     .NOTES
     General notes
     #>
     [CmdletBinding()]
     param (
+
         [Parameter(Mandatory=$true)][string]$GroupDN,
-        [Parameter(Mandatory=$true)][string]$Server
+        [Parameter(ValueFromPipeline=$true)][string]$Server = $(Get-ADDomainController),
+        [ValidateSet("All","ADDiff","GSDiff")][string]$Scope = "All"
+
     )
 
     PROCESS {
@@ -125,8 +195,8 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 * 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
+
         # First we need to gather information from both AD and GSuite about current users
-        # LogWrite "=== Querying AD for group $GroupDN for server $server"
         LogWrite "=== Querying AD for group $GroupDN for server $server" -Time $timevar
 
         $params = @{
@@ -140,113 +210,153 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         LogWrite "=== Querying GSuite for users" -Time $timevar
         $gsusers = Get-GSUser -filter *
 
-        # Checking for ADUsers that are have already been added to GSuite
-        LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
-        $combined = foreach ($aditem in $adusers) {
 
-           
-            foreach ($gsitem in $gsusers){
-
-                # Checks if first part of E-mail i_ivanov@ has a match
-                if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
-
-                    # Bandaid to fix some random user inserts, should be fed via parameter later on
-                    $lastname = $aditem.Name -replace "$($aditem.GivenName) "
-                    $lastname = $lastname -replace "\[Partner\] "
-                    $lastname = $lastname -replace "\(Blitz\)"
-                    $lastname = $lastname -replace "[0-9]$"
-
-                    LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)" -Time $timevar
-                    # Creating the Object
-                    [PSCustomObject]@{
-                        ADSID = $aditem.objectsid
-                        ADmail = $aditem.mail
-                        ADFirstName = $aditem.GivenName
-                        ADLastName = $lastname
-                        ADEnabled = $aditem.UserAccountControl
-                        GSID = $gsitem.Id
-                        GSmail = $gsitem.user
-                        GSFirstName = $gsitem.name.GivenName
-                        GSLastName = $gsitem.name.FamilyName
-                    }
-                } 
-        
-            }
-        
-        }
-
-        # Checks for AD users which have not been added to GSuite yet
-        LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
-        $different1 = foreach ($aditem in $adusers) {
-        
-            # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
-            if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
-
-                # Bandaid to fix some random user inserts, should be fed via parameter
-                $lastname = $aditem.Name -replace "$($aditem.GivenName) "
-                $lastname = $lastname -replace "\[Partner\] "
-                $lastname = $lastname -replace "\(Blitz\)"
-                $lastname = $lastname -replace "[0-9]$"            
+        # Working with $Scope, here's where most of everything will happen, need functions to make it more logical
+        switch ($Scope) {
+            All { 
                 
-                LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
-                # Creating the Object
-                [PSCustomObject]@{
-                    ADSID = $aditem.objectsid
-                    ADmail = $aditem.mail
-                    ADFirstName = $aditem.GivenName
-                    ADLastName = $lastname
-                    ADEnabled = $aditem.UserAccountControl
+                LogWrite "Scope: ALL is selected" -Time $timevar
+                LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
+                $combined = foreach ($aditem in $adusers) {
+                    foreach ($gsitem in $gsusers) {
+                        if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
+
+                            $params = @{
+                                InputObject = $aditem
+                                InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
+                            }
+                            $lastname = FixLastName @params
+                            
+                            LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)" -Time $timevar
+                        
+                            $params1 = @{
+                                ADSID = $aditem.objectsid
+                                ADmail = $aditem.mail
+                                ADFirstName = $aditem.GivenName
+                                ADLastName = $lastname
+                                ADEnabled = $aditem.UserAccountControl
+                                GSID = $gsitem.Id
+                                GSmail = $gsitem.user
+                                GSFirstName = $gsitem.name.GivenName
+                                GSLastName = $gsitem.name.FamilyName
+                            }
+                            OutputObject @params1
+                            
+                            
+                        } #if
+                    } #foreach
+                } #foreach
+
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
+                $different1 = foreach ($aditem in $adusers) {
+        
+                    # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
+                    if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
+        
+                        $params = @{
+                            InputObject = $aditem
+                            InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
+                        }
+                        $lastname = FixLastName @params          
+                        
+                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
+                        # Creating the Object
+                        $params2 = @{
+                            ADSID = $aditem.objectsid
+                            ADmail = $aditem.mail
+                            ADFirstName = $aditem.GivenName
+                            ADLastName = $lastname
+                            ADEnabled = $aditem.UserAccountControl
+                        }
+                        OutputObject @params2
+                    }
+                
                 }
-            }
-        
-        }
-        
-        # Checks for GSuite users that do not have a corresponding AD User account
-        LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
-        $different2 = foreach ($gsitem in $gsusers) {
-        
-            # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
-            if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
 
-                LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
-                # Creating the Object
-                [PSCustomObject]@{
-                    GSID = $gsitem.Id
-                    GSmail = $gsitem.user
-                    GSFirstName = $gsitem.name.GivenName
-                    GSLastName = $gsitem.name.FamilyName
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
+                $different2 = foreach ($gsitem in $gsusers) {
+        
+                    # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
+                    if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
+        
+                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
+                        # Creating the Object
+                        $params3 = @{
+                            GSID = $gsitem.Id
+                            GSmail = $gsitem.user
+                            GSFirstName = $gsitem.name.GivenName
+                            GSLastName = $gsitem.name.FamilyName
+                        }
+                        OutputObject @params3
+                    }
+                
                 }
-            }
+
+                # Combining everything
+                $total = $combined + $different1 + $different2
+                return $total
+
+                
+            } #ALL
+            ADDiff { 
+                LogWrite "Scope: ADDiff is selected" -Time $timevar
+            
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
+                foreach ($aditem in $adusers) {
         
-        }
+                    # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
+                    if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
+        
+                        $params = @{
+                            InputObject = $aditem
+                            InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
+                        }
+                        $lastname = FixLastName @params          
+                        
+                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
+                        # Creating the Object
+                        $params2 = @{
+                            ADSID = $aditem.objectsid
+                            ADmail = $aditem.mail
+                            ADFirstName = $aditem.GivenName
+                            ADLastName = $lastname
+                            ADEnabled = $aditem.UserAccountControl
+                        }
+                        OutputObject @params2
+                    }
+                
+                }
 
-        # Combining everything
-        $total = $combined + $different1 + $different2
+            } #ADDiff
+            GSDiff { 
 
-        # First we need to set the default properties we want in a standard array
-        $defaultProperties = 'ADMail', 'GSMail'
+                LogWrite "Scope: GSdiff is selected" -Time $timevar
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
+                foreach ($gsitem in $gsusers) {
+        
+                    # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
+                    if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
+        
+                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
+                        # Creating the Object
+                        $params3 = @{
+                            GSID = $gsitem.Id
+                            GSmail = $gsitem.user
+                            GSFirstName = $gsitem.name.GivenName
+                            GSLastName = $gsitem.name.FamilyName
+                        }
+                        OutputObject @params3
+                    }
+                
+                }
 
-        # Now we set up a propertyset
-        $defaultPropertiesSet = New-Object System.Management.Automation.PSPropertySet(`
-            'DefaultDisplayPropertySet' `
-            ,[string[]]$defaultProperties `
-            )
-
-        # Create a PS Member Info object from the propertyset
-        $members = [System.Management.Automation.PSMemberInfo[]]@($defaultPropertiesSet)
-
-        # Once this is done, we can add this to
-        $total | Add-Member MemberSet PSStandardMembers $members
-        $total
-
+            } #GSDiff
+            Default { 
+                LogWrite "Error Encountered"
+                Write-Error "Unknown Error ocurred..."
+            } #Default
+        } #switch 
 
     } #process
 } #function
-<#
-function New-MatchingUser {
-    param (
-        
-    )
-    
-}
-#>
+

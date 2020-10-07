@@ -1,3 +1,7 @@
 logs/*
+vars/*
 !logs/.gitkeep
+!vars/.gitkeep
 *.zip
+regexlist.txt
+logfile.log
