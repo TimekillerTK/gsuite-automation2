@@ -115,30 +115,39 @@ function OutputObject {
 function FixLastName {
     [CmdletBinding()]
     param (
-        [psobject[]]$InputObject,
+        [Parameter(ValueFromPipelineByPropertyName=$true)][psobject[]]$InputObject,
         [string[]]$InputRegex
     )
 
+
     foreach ($object in $InputObject) {
 
+        $setvalue = 0
         Write-Verbose "=== Object worked on is $($object.name)"
-        $lastname = $object.name -replace $object.GivenName
+        $lastname = $object.name -replace ($object.GivenName + " ")
         Write-Verbose "=== Lastname with GivenName removed is: $lastname"
 
         foreach ($regex in $InputRegex) {
             
             if ($lastname -match $regex) {
-            
                 Write-Verbose "=== Removing regex $regex"
-                $lastname -replace $regex
+                $lastname = $lastname -replace $regex
+                $lastname = $lastname -replace " "
+                $setvalue = 1
+                $lastname
                 
+            } 
             
-            }
+        }
 
+        if ($setvalue -eq 1) {
+            Write-Verbose "=== Setvalue is $setvalue, exiting iteration for $($object.name)"
+        } else {
+            Write-Verbose "=== Outputting with no match: $lastname"
+            $lastname
         }
     
     }
-    
 
 }
 
@@ -210,10 +219,15 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     foreach ($gsitem in $gsusers) {
                         if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
 
-                            $lastname = $aditem.Name -replace "$($aditem.GivenName) "
-                            $lastname = $lastname -replace "\[Partner\] "
-                            $lastname = $lastname -replace "\(Blitz\)"
-                            $lastname = $lastname -replace "[0-9]$"   
+                            $params = @{
+                                InputObject = $aditem
+                                InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                            }
+                            $lastname = FixLastName @params
+                            # $lastname = $aditem.Name -replace "$($aditem.GivenName) "
+                            # $lastname = $lastname -replace "\[Partner\] "
+                            # $lastname = $lastname -replace "\(Blitz\)"
+                            # $lastname = $lastname -replace "[0-9]$"   
                             
                             LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)" -Time $timevar
                         
@@ -241,11 +255,15 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
                     if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
         
-                        # Bandaid to fix some random user inserts, should be fed via parameter
-                        $lastname = $aditem.Name -replace "$($aditem.GivenName) "
-                        $lastname = $lastname -replace "\[Partner\] "
-                        $lastname = $lastname -replace "\(Blitz\)"
-                        $lastname = $lastname -replace "[0-9]$"            
+                        $params = @{
+                            InputObject = $aditem
+                            InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                        }
+                        $lastname = FixLastName @params
+                        # $lastname = $aditem.Name -replace "$($aditem.GivenName) "
+                        # $lastname = $lastname -replace "\[Partner\] "
+                        # $lastname = $lastname -replace "\(Blitz\)"
+                        # $lastname = $lastname -replace "[0-9]$"            
                         
                         LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
                         # Creating the Object
