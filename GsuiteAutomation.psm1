@@ -135,6 +135,7 @@ function FixLastName {
                 $lastname = $lastname -replace " "
                 $setvalue = 1
                 $lastname
+                LogWrite "Outputting with regex match: $lastname"
                 
             } 
             
