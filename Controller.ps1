@@ -1,5 +1,5 @@
 #Requires -Modules GSuiteAutomation
-#Import-Module GsuiteAutomation -Force
+Import-Module GsuiteAutomation -Force
 # Controller script for the process
 <#
 1. Use Get-MatchingUsers function to get a dump of info and store it in a variable $dump
@@ -27,7 +27,7 @@ More illustrations:
 $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
 # Import group from file
-$import = Import-csv "$PSScriptRoot\gsuiteautomation-vars.csv"
+$import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
 
 LogWrite ">> Controller: Started job for checking for new users"
 LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Time $timevar
@@ -35,12 +35,13 @@ $params = @{
     GroupDN = (Get-ADGroup $import.group).distinguishedname
     Server = $import.server
     Verbose = $true
+    Scope = "ADDiff"
 }
 
 # The below should probably be in a try/catch in case there's an issue pulling from AD or GSuite, or better yet...
 # It should be part of the Get-MatchingUsers function!
-$dump = Get-MatchingUsers @params
-$newusers = $dump | Where-Object {($_.admail -ne $null) -and ($_.gsmail -eq $null)} 
+$newusers = Get-MatchingUsers @params
+#$newusers = $dump | Where-Object {($_.admail -ne $null) -and ($_.gsmail -eq $null)} 
 
 # Checks if no new users need to be added
 If ($null -eq $newusers) {
@@ -98,7 +99,7 @@ Compress-Archive @archiveparams
 # Maybe it's a better idea to store the logs somewhere and create a separate file which gets triggered after everything is done to send the logs?
 LogWrite ">> Controller: Sending mail about job status: $mailsubject"
 # This var stores the SMTP/MailFrom/MailTo values
-$params = Import-csv "$PSScriptRoot\gsuiteautomation-mailvars.csv"
+$params = Import-csv "$PSScriptRoot\vars\gsuiteautomation-mailvars.csv"
 $params | Add-Member -MemberType NoteProperty `
                   -Name 'Priority' `
                   -Value $mailpriority
