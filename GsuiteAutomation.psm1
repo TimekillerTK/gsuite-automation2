@@ -71,7 +71,7 @@ Function LogWrite {
     If ($PSBoundParameters.ContainsKey('Time')) {
         $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile $([string]($time)).log"
     } else {
-        $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile.log"
+        $logfile = "$($MyInvocation.PSScriptRoot)\logfile.log"
     }
 
     # Set a timestamp

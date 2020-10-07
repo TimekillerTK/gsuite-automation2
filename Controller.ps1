@@ -27,8 +27,9 @@ More illustrations:
 $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
 # Import group from file
-$import = Import-csv "C:\Script\gsuiteautomation-vars.csv"
+$import = Import-csv "$PSScriptRoot\gsuiteautomation-vars.csv"
 
+LogWrite ">> Controller: Started job for checking for new users"
 LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Time $timevar
 $params = @{
     GroupDN = (Get-ADGroup $import.group).distinguishedname
@@ -85,7 +86,7 @@ If ($null -eq $newusers) {
     } #foreach
 } #else
 
-LogWrite ">> Controller: Archiving log files..." -Time $timevar
+LogWrite ">> Controller: Archiving log files and sending via mail..." -Time $timevar
 # Compress files here
 $archiveparams = @{
     Path = "$PSScriptRoot\logs\*.log"
@@ -95,9 +96,9 @@ Compress-Archive @archiveparams
 
 # This part needs rethinking, because none of this will be sent and logged,
 # Maybe it's a better idea to store the logs somewhere and create a separate file which gets triggered after everything is done to send the logs?
-LogWrite ">> Controller: Sending mail about job status: $mailsubject" -Time $timevar
+LogWrite ">> Controller: Sending mail about job status: $mailsubject"
 # This var stores the SMTP/MailFrom/MailTo values
-$params = Import-csv 'C:\Script\gsuiteautomation-mailvars.csv'
+$params = Import-csv "$PSScriptRoot\gsuiteautomation-mailvars.csv"
 $params | Add-Member -MemberType NoteProperty `
                   -Name 'Priority' `
                   -Value $mailpriority
@@ -118,7 +119,7 @@ foreach( $property in $params.psobject.properties.name )
 SendMail @hashtable
 
 
-LogWrite ">> Controller: Cleaning up files..." -Time $timevar
+LogWrite ">> Controller: Cleaning up files..."
 
 # Delete items after sending is successful!
 # This errors out because the mail process is still using the file at this point which can't be deleted until the message is sent
@@ -130,14 +131,14 @@ $archiveparams.DestinationPath, $archiveparams.Path | ForEach-Object {
         # Mail process may not be finished sending mail yet at this point, therefore try/catch
         try {
 
-            LogWrite ">> Controller: Attempting to delete files in path $_" -Time $timevar
+            LogWrite ">> Controller: Attempting to delete files in path $_"
             Remove-Item -Path $_ -ErrorAction Stop
             $end = 5
         
         } catch {
         
             $end++
-            LogWrite ">> Controller: Error deleting file $_, trying again in 5 seconds... " -Time $timevar
+            LogWrite ">> Controller: Error deleting file $_, trying again in 5 seconds... "
             Start-Sleep -s 5
         
         }
