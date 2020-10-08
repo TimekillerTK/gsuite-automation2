@@ -155,13 +155,25 @@ function FixLastName {
 function Get-MatchingUsers {
     <#
     .SYNOPSIS
-    For fetching a list of GSuite and AD Users and matching them up
+    For fetching a list of matching GSuite and AD Users based on AD Group
     
     .DESCRIPTION
-    For fetching a list of GSuite and AD Users and matching them up
+    This cmdlet matches up a group of AD Users up against GSuite users based on the mail attribute
 
     .EXAMPLE
-    Get-MatchingUsers -GroupDN "CN=Group" -Server
+    Get-MatchingUsers -GroupDN "CN=GROUP,OU=Path,DC=corp,DC=contoso,DC=com"
+    
+    This will return a list of matching users, users unique to AD, and users unique to GS for GROUP
+
+    .EXAMPLE
+    Get-MatchingUsers -GroupDN (Get-ADGroup GROUP).DistinguishedName -Server DC-11
+
+    This will return the same as above, but this time querying a specific Domain Controller DC-11 for GROUP
+
+    .EXAMPLE
+    Get-MatchingUsers -GroupDN (Get-ADGroup GROUP).DistinguishedName -Scope GSDiff
+    
+    This will return only users unique to GSuite for GROUP
     
     .NOTES
     General notes
@@ -169,9 +181,15 @@ function Get-MatchingUsers {
     [CmdletBinding()]
     param (
 
-        [Parameter(Mandatory=$true)][string]$GroupDN,
-        [Parameter(ValueFromPipeline=$true)][string]$Server = $(Get-ADDomainController),
-        [ValidateSet("All","ADDiff","GSDiff")][string]$Scope = "All"
+        # Supply group in LDAP DistinguishedName format
+        [Parameter(Mandatory=$true)]
+        [string]$GroupDN,
+
+        [Parameter(ValueFromPipeline=$true)]
+        [string]$Server = $(Get-ADDomainController),
+        [ValidateSet("All","ADDiff","GSDiff")]
+        
+        [string]$Scope = "All"
 
     )
 

@@ -1,32 +1,10 @@
 #Requires -Modules GSuiteAutomation
 Import-Module GsuiteAutomation -Force
-# Controller script for the process
-<#
-1. Use Get-MatchingUsers function to get a dump of info and store it in a variable $dump
-2. For each $user of $dump that have $_.admail and don't have $_.gsmail, create GSUser in Try/Catch function
-    - If fails, set subject to "FAILED", set high priority
-    - If succeeds, set normal mail subject, set medium priority
-3. Zip logs
-4. Send mail with attached zipped log
-#>
-
-<#
-VARS THAT NEED TO BE INPUT:
-$server (DC)
-$group (DistinguishedName)
-$domain (mail domain for GSuite Server)
-
-Ideas for logging:
-* Should be logged to a generic log file, which is then renamed to the timestamped one at the very end.
-
-More illustrations:
-* 
-#>
 
 # The following below is unfortunately required for the LogWrite function to work properly
 $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
-# Import group from file
+# Import important variables needed for script run
 $import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
 
 LogWrite ">> Controller: Started job for checking for new users"
@@ -41,14 +19,15 @@ $params = @{
 # The below should probably be in a try/catch in case there's an issue pulling from AD or GSuite, or better yet...
 # It should be part of the Get-MatchingUsers function!
 $newusers = Get-MatchingUsers @params
-#$newusers = $dump | Where-Object {($_.admail -ne $null) -and ($_.gsmail -eq $null)} 
 
-# Checks if no new users need to be added
+
+# Checks, if no new users need to be added
 If ($null -eq $newusers) {
 
     LogWrite ">> Controller: No new users needed" -Time $timevar
+
     # SET THE VARS HERE
-    $mailsubject = "No new users"
+    $status = "NOACT"
     $mailpriority = "Normal"
 
 } else {
@@ -67,17 +46,18 @@ If ($null -eq $newusers) {
             }
             
             LogWrite ">> Controller: Creating user $($user.admail)" -Time $timevar
+            # The below should be logged with LogWrite, at the moment its' being output to terminal
             New-GSuser @params
 
-            # setting mailsubject and priority DOES IT FOR EVERY SINGLE USER FIX THIS
-            $mailsubject = "Success"
+            # setting status and priority DOES IT FOR EVERY SINGLE USER FIX THIS
+            $status = "ADDED"
             $mailpriority = "Normal"
 
         } #try
         catch {
             # DOES IT FOR EVERY SINGLE USER FIX THIS
             LogWrite ">> Controller: Error on $($user.admail)..." -Time $timevar
-            $mailsubject = "Fail"
+            $status = "FAIL"
             $mailpriority = "High"
 
             # This breaks out of the loop, doesn't stop the script though
@@ -95,9 +75,12 @@ $archiveparams = @{
 }
 Compress-Archive @archiveparams
 
+# Mail subject set here, should accept different values
+$mailsubject = "[$status] Script run $(get-date -Format 'dd-MM-yyyy HH:mm:ss')"
+
 # This part needs rethinking, because none of this will be sent and logged,
 # Maybe it's a better idea to store the logs somewhere and create a separate file which gets triggered after everything is done to send the logs?
-LogWrite ">> Controller: Sending mail about job status: $mailsubject"
+LogWrite ">> Controller: Sending mail about job status: $status"
 # This var stores the SMTP/MailFrom/MailTo values
 $params = Import-csv "$PSScriptRoot\vars\gsuiteautomation-mailvars.csv"
 $params | Add-Member -MemberType NoteProperty `
