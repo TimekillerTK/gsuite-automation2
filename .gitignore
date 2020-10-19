@@ -1,7 +1,7 @@
-logs/*
-vars/*
-!logs/.gitkeep
-!vars/.gitkeep
-*.zip
-regexlist.txt
-logfile.log
+GSuiteAutomation/logs/*
+GSuiteAutomation/vars/*
+!GSuiteAutomation/logs/.gitkeep
+!GSuiteAutomation/vars/.gitkeep
+GSuiteAutomation/*.zip
+GSuiteAutomation/regexlist.txt
+GSuiteAutomation/logfile.log

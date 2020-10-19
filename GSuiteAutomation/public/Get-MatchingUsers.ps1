@@ -1,156 +1,6 @@
+
 #Requires -Modules PSGsuite,ActiveDirectory
 
-# Mail sending function
-function SendMail {
-    [CmdletBinding()]
-    param (
-        # Smtp server that will send the message
-        [Parameter(Mandatory=$true)]
-        [string]
-        $SmtpServer,
-
-        [Parameter(Mandatory=$true)]
-        [string]
-        $MailFrom,
-
-        [Parameter(Mandatory=$true)]
-        [string]
-        $MailTo,
-
-        # Body of the mail, optional.
-        [Parameter()]
-        [string]
-        $MailBody,
-
-        # Sets the E-mail subject line
-        [Parameter()]
-        [string]
-        $Subject = "GSuite script run $(get-date -Format 'dd-MM-yyyy HH:mm:ss')",
-
-        # Sets the E-mail priority
-        [Parameter()]
-        [string]
-        $Priority = "Normal",
-
-        [Parameter()]
-        [string]
-        $AttachmentPath      
-        
-    )
-  
-
-    $SMTPClient=New-Object System.Net.Mail.smtpClient
-    $SMTPClient.host=$smtpServer
-    $SMTPClient.EnableSSL=$true
-    $SMTPClient.UseDefaultCredentials=$true
-    
-    
-    $MailMessage=New-Object System.Net.Mail.MailMessage
-    $MailMessage.Priority= $([System.Net.Mail.MailPriority]::$Priority)
-    $MailMessage.From=$MailFrom
-    $MailMessage.To.Add($MailTo)
-    
-    $MailMessage.Subject=$Subject
-    $MailMessage.IsBodyHtml=$true
-    $MailMessage.BodyEncoding= $([System.Text.Encoding]::UTF8)
-    $MailMessage.Body=$MailBody
-    $MailMessage.Attachments.Add($AttachmentPath)
-    $SMTPClient.Send($MailMessage)
-  
-}
-
-
-# Logging function
-Function LogWrite {
-    Param (
-        [string]$LogString,
-        [string]$Time
-        )
-
-    # Checks if the time parameter is present or not
-    If ($PSBoundParameters.ContainsKey('Time')) {
-        $logfile = "$($MyInvocation.PSScriptRoot)\logs\logfile $([string]($time)).log"
-    } else {
-        $logfile = "$($MyInvocation.PSScriptRoot)\logfile.log"
-    }
-
-    # Set a timestamp
-    $checktime = get-date -Format "[dd/MM/yy HH:mm:ss] "
-    $logstring = $checktime + $logstring
-
-    # Command outputs both to Verbose pipeline as well as to a file
-    Write-Verbose $logstring
-    Add-Content $logfile -value $logstring
-}
-
-# Function for creating the object in Get-MatchingUsers
-function OutputObject {
-    param (
-        $GSID,
-        $GSMail,
-        $GSFirstName,
-        $GSLastName,
-        $ADSID,
-        $ADmail,
-        $ADFirstName,
-        $ADLastName,
-        $ADEnabled
-    )
-
-    $object = [PSCustomObject]@{
-        ADSID = $ADSID
-        ADmail = $ADmail
-        ADFirstName = $ADFirstName
-        ADLastName = $ADLastName
-        ADEnabled = $ADEnabled
-        GSID = $GSID
-        GSmail = $GSmail
-        GSFirstName = $GSFirstName
-        GSLastName = $GSLastName
-    }
-    return $object
-
-}
-
-function FixLastName {
-    [CmdletBinding()]
-    param (
-        [Parameter(ValueFromPipelineByPropertyName=$true)][psobject[]]$InputObject,
-        [string[]]$InputRegex
-    )
-
-
-    foreach ($object in $InputObject) {
-
-        $setvalue = 0
-        LogWrite "=== Object worked on is $($object.name)" -Time $timevar
-        $lastname = $object.name -replace ($object.GivenName + " ")
-        LogWrite "=== Lastname with GivenName removed is: $lastname" -Time $timevar
-
-        foreach ($regex in $InputRegex) {
-            
-            if ($lastname -match $regex) {
-                LogWrite "=== Removing regex $regex" -Time $timevar
-                $lastname = $lastname -replace $regex
-                $lastname = $lastname -replace " "
-                $setvalue = 1
-                $lastname
-                LogWrite "Outputting with regex match: $lastname"
-                
-            } 
-            
-        }
-
-        if ($setvalue -eq 1) {
-            LogWrite "=== Setvalue is $setvalue, exiting iteration for $($object.name)" -Time $timevar
-        } else {
-            LogWrite "=== Outputting with no match: $lastname" -Time $timevar
-            $lastname
-        }
-    
-    }
-
-}
 
 function Get-MatchingUsers {
     <#
@@ -195,6 +45,36 @@ function Get-MatchingUsers {
 
     PROCESS {
     
+        # Function for creating the object in Get-MatchingUsers
+# Should this be a class?
+        function OutputObject {
+            param (
+                $GSID,
+                $GSMail,
+                $GSFirstName,
+                $GSLastName,
+                $ADSID,
+                $ADmail,
+                $ADFirstName,
+                $ADLastName,
+                $ADEnabled
+            )
+
+            $object = [PSCustomObject]@{
+                ADSID = $ADSID
+                ADmail = $ADmail
+                ADFirstName = $ADFirstName
+                ADLastName = $ADLastName
+                ADEnabled = $ADEnabled
+                GSID = $GSID
+                GSmail = $GSmail
+                GSFirstName = $GSFirstName
+                GSLastName = $GSLastName
+            }
+            return $object
+
+        }
+        
         # For logging, setting a variable for LogWrite with a certain date test
         $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
 
