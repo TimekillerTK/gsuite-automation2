@@ -1,19 +1,20 @@
-#Requires -Modules GSuiteAutomation
-Import-Module GsuiteAutomation -Force
+Import-Module "$PSScriptRoot\GSuiteAutomation.psm1" -Force
 
-# The following below is unfortunately required for the LogWrite function to work properly
-$timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
+# # The following below is unfortunately required for timestamping log and zip file
+$timevar = Get-Date -Format "yyyyMMdd-HHmmss"
+$logpath = "$PSScriptRoot\logs\Logfile_$timevar.log"
 
 # Import important variables needed for script run
 $import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
 
-LogWrite ">> Controller: Started job for checking for new users"
-LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Time $timevar
+LogWrite ">> Controller: Started job for checking for new users" -Verbose -Path $logpath
+LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Verbose -Path $logpath
 $params = @{
     GroupDN = (Get-ADGroup $import.group).distinguishedname
     Server = $import.server
     Verbose = $true
     Scope = "ADDiff"
+    LogPath = $logpath
 }
 
 # The below should probably be in a try/catch in case there's an issue pulling from AD or GSuite, or better yet...
@@ -24,14 +25,14 @@ $newusers = Get-MatchingUsers @params
 # Checks, if no new users need to be added
 If ($null -eq $newusers) {
 
-    LogWrite ">> Controller: No new users needed" -Time $timevar
+    LogWrite ">> Controller: No new users needed" -Verbose -Path $logpath
 
     # SET THE VARS HERE
     $status = "NOACT"
     $mailpriority = "Normal"
 
 } else {
-    LogWrite ">> Controller: New GSuite users needed... Creating new users" -Time $timevar
+    LogWrite ">> Controller: New GSuite users needed... Creating new users" -Verbose -Path $logpath
     foreach ($user in $newusers) {
 
         try {
@@ -45,7 +46,7 @@ If ($null -eq $newusers) {
                 ErrorAction = 'Stop'
             }
             
-            LogWrite ">> Controller: Creating user $($user.admail)" -Time $timevar
+            LogWrite ">> Controller: Creating user $($user.admail)" -Verbose -Path $logpath
             # The below should be logged with LogWrite, at the moment its' being output to terminal
             New-GSuser @params
 
@@ -56,7 +57,7 @@ If ($null -eq $newusers) {
         } #try
         catch {
             # DOES IT FOR EVERY SINGLE USER FIX THIS
-            LogWrite ">> Controller: Error on $($user.admail)..." -Time $timevar
+            LogWrite ">> Controller: Error on $($user.admail)..." -Verbose -Path $logpath
             $status = "FAIL"
             $mailpriority = "High"
 
@@ -67,11 +68,11 @@ If ($null -eq $newusers) {
     } #foreach
 } #else
 
-LogWrite ">> Controller: Archiving log files and sending via mail..." -Time $timevar
+LogWrite ">> Controller: Archiving log files and sending via mail..." -Verbose -Path $logpath
 # Compress files here
 $archiveparams = @{
-    Path = "$PSScriptRoot\logs\*.log"
-    DestinationPath = "$PSScriptRoot\Logs_$($timevar).zip"
+    Path = $logpath
+    DestinationPath = "$PSScriptRoot\Logs_$timevar.zip"
 }
 Compress-Archive @archiveparams
 
@@ -80,7 +81,7 @@ $mailsubject = "[$status] Script run $(get-date -Format 'dd-MM-yyyy HH:mm:ss')"
 
 # This part needs rethinking, because none of this will be sent and logged,
 # Maybe it's a better idea to store the logs somewhere and create a separate file which gets triggered after everything is done to send the logs?
-LogWrite ">> Controller: Sending mail about job status: $status"
+LogWrite ">> Controller: Sending mail about job status: $status" -Verbose -Path $logpath
 # This var stores the SMTP/MailFrom/MailTo values
 $params = Import-csv "$PSScriptRoot\vars\gsuiteautomation-mailvars.csv"
 $params | Add-Member -MemberType NoteProperty `
@@ -102,31 +103,61 @@ foreach( $property in $params.psobject.properties.name )
 
 SendMail @hashtable
 
-
-LogWrite ">> Controller: Cleaning up files..."
+LogWrite ">> Controller: Cleaning up archive files..." -Verbose -Path $logpath
 
 # Delete items after sending is successful!
 # This errors out because the mail process is still using the file at this point which can't be deleted until the message is sent
 # Will retry 5 times, then stop 
-$archiveparams.DestinationPath, $archiveparams.Path | ForEach-Object {
+# $archiveparams.DestinationPath | ForEach-Object {
 
-    do {
+#     do {
 
-        # Mail process may not be finished sending mail yet at this point, therefore try/catch
-        try {
+#         # Mail process may not be finished sending mail yet at this point, therefore try/catch
+#         try {
 
-            LogWrite ">> Controller: Attempting to delete files in path $_"
-            Remove-Item -Path $_ -ErrorAction Stop
-            $end = 5
+#             LogWrite ">> Controller: Attempting to delete files in path $_" -Verbose -Path $logpath
+#             Remove-Item -Path $_ -ErrorAction Stop
+#             $end = 5
         
-        } catch {
+#         } catch {
         
-            $end++
-            LogWrite ">> Controller: Error deleting file $_, trying again in 5 seconds... "
-            Start-Sleep -s 5
+#             $end++
+#             LogWrite ">> Controller: Error deleting file $_, trying again in 5 seconds... " -Verbose -Path $logpath
+#             Start-Sleep -s 5
         
-        }
+#         }
         
-    } until ($end -eq 5)
-        
+#     } until ($end -eq 5)
+    
+# This function checks whether the file in $filepath is currently being used
+function CheckFileStatus ($filepath) {
+    $fileInfo = New-Object System.IO.FileInfo $filepath
+
+    try {
+
+        $filestream = $fileInfo.Open( [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read )
+        LogWrite ">> CheckFileStatus: File $filepath is not in use. Continuing..." -Verbose -Path
+        return $true
+
+    } catch {
+
+        # Too spammy so commented out
+        #LogWrite ">> CheckFileStatus: Warning! File $filepath is in use." -Verbose -Path $logpath
+        return $false
+
+    }
+
 }
+
+# This doesn't work for some reason, the file is still opened.
+# do {
+
+#     if ((CheckFileStatus -FilePath $archiveparams.DestinationPath) -eq $true) {
+        
+#         Remove-Item -Path $archiveparams.DestinationPath
+#         LogWrite ">> CheckFileStatus: Deleted $($archiveparams.DestinationPath)" -Verbose -Path $logpath
+#         $endloop = $true
+
+#     }
+
+# } until ($endloop -eq $true) 

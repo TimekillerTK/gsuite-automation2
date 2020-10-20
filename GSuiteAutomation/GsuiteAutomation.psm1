@@ -1,7 +1,5 @@
 $private = @(
-    'FixLastName'
-    'LogWrite'
-    'SendMail'
+
 )
 
 foreach ($file in $private) {
@@ -10,7 +8,8 @@ foreach ($file in $private) {
 
 $public = @(
     'Get-MatchingUsers'
-
+    'LogWrite'
+    'SendMail'
 )
 
 foreach ($file in $public) {
@@ -19,6 +18,8 @@ foreach ($file in $public) {
 
 $functionsToExport = @(
     'Get-MatchingUsers'
+    'LogWrite'
+    'SendMail'
 )
 
 Export-ModuleMember -Function $functionsToExport

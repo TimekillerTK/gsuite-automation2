@@ -39,14 +39,16 @@ function Get-MatchingUsers {
         [string]$Server = $(Get-ADDomainController),
         [ValidateSet("All","ADDiff","GSDiff")]
         
-        [string]$Scope = "All"
+        [string]$Scope = "All",
+
+        [string]$LogPath = "$($MyInvocation.PSScriptRoot)\logfile.log"
 
     )
 
     PROCESS {
     
         # Function for creating the object in Get-MatchingUsers
-# Should this be a class?
+        # Should this be a class?
         function OutputObject {
             param (
                 $GSID,
@@ -74,9 +76,46 @@ function Get-MatchingUsers {
             return $object
 
         }
+        function FixLastName {
+            [CmdletBinding()]
+            param (
+                [Parameter(ValueFromPipelineByPropertyName=$true)][psobject[]]$InputObject,
+                [string[]]$InputRegex
+            )
         
-        # For logging, setting a variable for LogWrite with a certain date test
-        $timevar = Get-Date -Format "dd-MM-yy HH-mm-ss"
+        
+            foreach ($object in $InputObject) {
+        
+                $setvalue = 0
+                LogWrite "=== Object worked on is $($object.name)" -Path $LogPath
+                $lastname = $object.name -replace ($object.GivenName + " ")
+                LogWrite "=== Lastname with GivenName removed is: $lastname" -Path $LogPath
+        
+                foreach ($regex in $InputRegex) {
+                    
+                    if ($lastname -match $regex) {
+                        LogWrite "=== Removing regex $regex" -Path $LogPath
+                        $lastname = $lastname -replace $regex
+                        $lastname = $lastname -replace " "
+                        $setvalue = 1
+                        $lastname
+                        LogWrite "Outputting with regex match: $lastname" -Path $LogPath
+                        
+                    } 
+                    
+                }
+        
+                if ($setvalue -eq 1) {
+                    LogWrite "=== Setvalue is $setvalue, exiting iteration for $($object.name)" -Path $LogPath
+                } else {
+                    LogWrite "=== Outputting with no match: $lastname" -Path $LogPath
+                    $lastname
+                }
+            
+            }
+        
+        }
+
 
 <# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
 operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
@@ -95,7 +134,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 #>
 
         # First we need to gather information from both AD and GSuite about current users
-        LogWrite "=== Querying AD for group $GroupDN for server $server" -Time $timevar
+        LogWrite "=== Querying AD for group $GroupDN for server $server" -Path $LogPath
 
         $params = @{
             Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
@@ -105,7 +144,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         $adusers = Get-ADObject @params
 
         #$adusers = Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail,objectsid,department,accountexpires,givenname,UserAccountControl
-        LogWrite "=== Querying GSuite for users" -Time $timevar
+        LogWrite "=== Querying GSuite for users" -Path $LogPath
         $gsusers = Get-GSUser -filter *
 
 
@@ -113,19 +152,19 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         switch ($Scope) {
             All { 
                 
-                LogWrite "Scope: ALL is selected" -Time $timevar
-                LogWrite '=== Looping through $adusers and $gsusers to find common items' -Time $timevar
+                LogWrite "Scope: ALL is selected" -Path $LogPath
+                LogWrite '=== Looping through $adusers and $gsusers to find common items' -Path $LogPath
                 $combined = foreach ($aditem in $adusers) {
                     foreach ($gsitem in $gsusers) {
                         if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
 
                             $params = @{
                                 InputObject = $aditem
-                                InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
+                                InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
                             }
                             $lastname = FixLastName @params
                             
-                            LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)" -Time $timevar
+                            LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)"
                         
                             $params1 = @{
                                 ADSID = $aditem.objectsid
@@ -145,7 +184,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     } #foreach
                 } #foreach
 
-                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Path $LogPath
                 $different1 = foreach ($aditem in $adusers) {
         
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
@@ -153,11 +192,11 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         
                         $params = @{
                             InputObject = $aditem
-                            InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
+                            InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
                         }
                         $lastname = FixLastName @params          
                         
-                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
+                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
                         # Creating the Object
                         $params2 = @{
                             ADSID = $aditem.objectsid
@@ -171,13 +210,13 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                 
                 }
 
-                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Path $LogPath
                 $different2 = foreach ($gsitem in $gsusers) {
         
                     # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
                     if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
         
-                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
+                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Path $LogPath
                         # Creating the Object
                         $params3 = @{
                             GSID = $gsitem.Id
@@ -197,9 +236,9 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                 
             } #ALL
             ADDiff { 
-                LogWrite "Scope: ADDiff is selected" -Time $timevar
+                LogWrite "Scope: ADDiff is selected" -Path $LogPath
             
-                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Time $timevar
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $adusers' -Path $LogPath
                 foreach ($aditem in $adusers) {
         
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
@@ -207,11 +246,11 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         
                         $params = @{
                             InputObject = $aditem
-                            InputRegex = Get-Content "$($PSScriptRoot)\regexlist.txt"
+                            InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
                         }
                         $lastname = FixLastName @params          
                         
-                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Time $timevar
+                        LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
                         # Creating the Object
                         $params2 = @{
                             ADSID = $aditem.objectsid
@@ -228,14 +267,14 @@ This should be later changed to making an AD account show up as Enabled/Disabled
             } #ADDiff
             GSDiff { 
 
-                LogWrite "Scope: GSdiff is selected" -Time $timevar
-                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Time $timevar
+                LogWrite "Scope: GSdiff is selected" -Path $LogPath
+                LogWrite '=== Looping through $adusers and $gsusers to find items only found in $gsusers' -Path $LogPath
                 foreach ($gsitem in $gsusers) {
         
                     # If the mail property of the $gsitem iterated on is NOT in $adusers.mail
                     if (!(($gsitem.user -replace "@(.*)") -in ($adusers.mail -replace "@(.*)"))){
         
-                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Time $timevar
+                        LogWrite "Creating PSObject: $($gsitem.user) with no match" -Path $LogPath
                         # Creating the Object
                         $params3 = @{
                             GSID = $gsitem.Id
@@ -250,7 +289,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 
             } #GSDiff
             Default { 
-                LogWrite "Error Encountered"
+                LogWrite "Error Encountered" -Path $LogPath
                 Write-Error "Unknown Error ocurred..."
             } #Default
         } #switch 
