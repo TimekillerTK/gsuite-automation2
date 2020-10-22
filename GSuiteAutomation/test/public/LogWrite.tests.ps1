@@ -21,6 +21,12 @@ Describe "LogWrite Tests" {
         #     "[dd/MM/yy HH:mm:ss]"
         # }
 
+        it 'Just for checking path debug' -Skip {
+            $DebugPreference = 'Continue'
+            Write-Debug "$PSScriptRoot"
+            Write-Debug $MyInvocation.PSScriptRoot
+            Get-Item . | Write-Debug
+        }
 
         It "should be in correct location with correct string with path" {
 

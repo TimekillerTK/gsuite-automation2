@@ -5,6 +5,8 @@ Function LogWrite {
         [Parameter(Mandatory=$true)][string]$Path
         )
 
+    ## $PATH SHOULD PROBABLY BE OPTIONAL AND JUST OUTPUT VERBOSE OUTPUT
+
     $checktime = get-date -Format "[dd/MM/yy HH:mm:ss]-"
     # Using Get-PSCallStack like this may be buggy, investigate later for better ways to do this
     $CallerScript = "[$((Get-PSCallStack).Command[1])] "

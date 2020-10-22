@@ -80,7 +80,8 @@ function Get-MatchingUsers {
             [CmdletBinding()]
             param (
                 [Parameter(ValueFromPipelineByPropertyName=$true)][psobject[]]$InputObject,
-                [string[]]$InputRegex
+                [string[]]$InputRegex,
+                [string]$LogPath
             )
         
         
@@ -147,6 +148,8 @@ This should be later changed to making an AD account show up as Enabled/Disabled
         LogWrite "=== Querying GSuite for users" -Path $LogPath
         $gsusers = Get-GSUser -filter *
 
+        # Checks whether path with regex strings exists
+        $regexpath = Test-Path -Path "$($MyInvocation.PSScriptRoot)\vars\regexlist.txt"
 
         # Working with $Scope, here's where most of everything will happen, need functions to make it more logical
         switch ($Scope) {
@@ -154,14 +157,28 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                 
                 LogWrite "Scope: ALL is selected" -Path $LogPath
                 LogWrite '=== Looping through $adusers and $gsusers to find common items' -Path $LogPath
+
                 $combined = foreach ($aditem in $adusers) {
                     foreach ($gsitem in $gsusers) {
                         if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
 
-                            $params = @{
-                                InputObject = $aditem
-                                InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                            if ($regexpath) {
+
+                                LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
+                                $params = @{
+                                    InputObject = $aditem
+                                    InputRegex = $regexpath
+                                    LogPath = $LogPath
+                                }
+                            } else {
+
+                                LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
+                                $params = @{
+                                    InputObject = $aditem
+                                    LogPath = $LogPath
+                                }
                             }
+
                             $lastname = FixLastName @params
                             
                             LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)"
@@ -190,10 +207,23 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
                     if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
         
-                        $params = @{
-                            InputObject = $aditem
-                            InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                        if ($regexpath) {
+
+                            LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
+                            $params = @{
+                                InputObject = $aditem
+                                InputRegex = $regexpath
+                                LogPath = $LogPath
+                            }
+                        } else {
+
+                            LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
+                            $params = @{
+                                InputObject = $aditem
+                                LogPath = $LogPath
+                            }
                         }
+
                         $lastname = FixLastName @params          
                         
                         LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
@@ -244,9 +274,21 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
                     if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
         
-                        $params = @{
-                            InputObject = $aditem
-                            InputRegex = Get-Content "$($MyInvocation.PSScriptRoot)\regexlist.txt"
+                        if ($regexpath) {
+
+                            LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
+                            $params = @{
+                                InputObject = $aditem
+                                InputRegex = $regexpath
+                                LogPath = $LogPath
+                            }
+                        } else {
+
+                            LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
+                            $params = @{
+                                InputObject = $aditem
+                                LogPath = $LogPath
+                            }
                         }
                         $lastname = FixLastName @params          
                         

@@ -7,8 +7,7 @@ $logpath = "$PSScriptRoot\logs\Logfile_$timevar.log"
 # Import important variables needed for script run
 $import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
 
-LogWrite ">> Controller: Started job for checking for new users" -Verbose -Path $logpath
-LogWrite ">> Controller: Compiling a list of matching users for AD and GSuite" -Verbose -Path $logpath
+LogWrite "Started job for checking for new users" -Verbose -Path $logpath
 $params = @{
     GroupDN = (Get-ADGroup $import.group).distinguishedname
     Server = $import.server
@@ -25,14 +24,14 @@ $newusers = Get-MatchingUsers @params
 # Checks, if no new users need to be added
 If ($null -eq $newusers) {
 
-    LogWrite ">> Controller: No new users needed" -Verbose -Path $logpath
+    LogWrite "No new users needed" -Verbose -Path $logpath
 
     # SET THE VARS HERE
     $status = "NOACT"
     $mailpriority = "Normal"
 
 } else {
-    LogWrite ">> Controller: New GSuite users needed... Creating new users" -Verbose -Path $logpath
+    LogWrite "New GSuite users needed... Creating new users" -Verbose -Path $logpath
     foreach ($user in $newusers) {
 
         try {
@@ -46,9 +45,9 @@ If ($null -eq $newusers) {
                 ErrorAction = 'Stop'
             }
             
-            LogWrite ">> Controller: Creating user $($user.admail)" -Verbose -Path $logpath
+            LogWrite "Creating user $($user.admail)" -Verbose -Path $logpath
             # The below should be logged with LogWrite, at the moment its' being output to terminal
-            New-GSuser @params
+            New-GSuser @params | Out-Null
 
             # setting status and priority DOES IT FOR EVERY SINGLE USER FIX THIS
             $status = "ADDED"
@@ -57,7 +56,7 @@ If ($null -eq $newusers) {
         } #try
         catch {
             # DOES IT FOR EVERY SINGLE USER FIX THIS
-            LogWrite ">> Controller: Error on $($user.admail)..." -Verbose -Path $logpath
+            LogWrite "Error on $($user.admail)..." -Verbose -Path $logpath
             $status = "FAIL"
             $mailpriority = "High"
 
@@ -68,7 +67,7 @@ If ($null -eq $newusers) {
     } #foreach
 } #else
 
-LogWrite ">> Controller: Archiving log files and sending via mail..." -Verbose -Path $logpath
+LogWrite "Archiving log files and sending via mail..." -Verbose -Path $logpath
 # Compress files here
 $archiveparams = @{
     Path = $logpath
@@ -81,7 +80,7 @@ $mailsubject = "[$status] Script run $(get-date -Format 'dd-MM-yyyy HH:mm:ss')"
 
 # This part needs rethinking, because none of this will be sent and logged,
 # Maybe it's a better idea to store the logs somewhere and create a separate file which gets triggered after everything is done to send the logs?
-LogWrite ">> Controller: Sending mail about job status: $status" -Verbose -Path $logpath
+LogWrite "Sending mail about job status: $status" -Verbose -Path $logpath
 # This var stores the SMTP/MailFrom/MailTo values
 $params = Import-csv "$PSScriptRoot\vars\gsuiteautomation-mailvars.csv"
 $params | Add-Member -MemberType NoteProperty `
@@ -103,7 +102,8 @@ foreach( $property in $params.psobject.properties.name )
 
 SendMail @hashtable
 
-LogWrite ">> Controller: Cleaning up archive files..." -Verbose -Path $logpath
+# Cleanup will be implemented at a later date.
+# LogWrite "Cleaning up archive files..." -Verbose -Path $logpath
 
 # Delete items after sending is successful!
 # This errors out because the mail process is still using the file at this point which can't be deleted until the message is sent
@@ -115,39 +115,39 @@ LogWrite ">> Controller: Cleaning up archive files..." -Verbose -Path $logpath
 #         # Mail process may not be finished sending mail yet at this point, therefore try/catch
 #         try {
 
-#             LogWrite ">> Controller: Attempting to delete files in path $_" -Verbose -Path $logpath
+#             LogWrite "Attempting to delete files in path $_" -Verbose -Path $logpath
 #             Remove-Item -Path $_ -ErrorAction Stop
 #             $end = 5
         
 #         } catch {
         
 #             $end++
-#             LogWrite ">> Controller: Error deleting file $_, trying again in 5 seconds... " -Verbose -Path $logpath
+#             LogWrite "Error deleting file $_, trying again in 5 seconds... " -Verbose -Path $logpath
 #             Start-Sleep -s 5
         
 #         }
         
 #     } until ($end -eq 5)
     
-# This function checks whether the file in $filepath is currently being used
-function CheckFileStatus ($filepath) {
-    $fileInfo = New-Object System.IO.FileInfo $filepath
+# This function checks whether the file in $filepath is currently being used, to be used later
+# function CheckFileStatus ($filepath) {
+#     $fileInfo = New-Object System.IO.FileInfo $filepath
 
-    try {
+#     try {
 
-        $filestream = $fileInfo.Open( [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read )
-        LogWrite ">> CheckFileStatus: File $filepath is not in use. Continuing..." -Verbose -Path
-        return $true
+#         $filestream = $fileInfo.Open( [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read )
+#         LogWrite ">> CheckFileStatus: File $filepath is not in use. Continuing..." -Verbose -Path
+#         return $true
 
-    } catch {
+#     } catch {
 
-        # Too spammy so commented out
-        #LogWrite ">> CheckFileStatus: Warning! File $filepath is in use." -Verbose -Path $logpath
-        return $false
+#         # Too spammy so commented out
+#         #LogWrite ">> CheckFileStatus: Warning! File $filepath is in use." -Verbose -Path $logpath
+#         return $false
 
-    }
+#     }
 
-}
+# }
 
 # This doesn't work for some reason, the file is still opened.
 # do {
@@ -161,3 +161,4 @@ function CheckFileStatus ($filepath) {
 #     }
 
 # } until ($endloop -eq $true) 
+
