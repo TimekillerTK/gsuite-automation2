@@ -82,4 +82,4 @@ input (from Get-ADUser and Get-GSUser) without having to do anything extra.
     
 #     Write-Output $user
     
-}
+#}
