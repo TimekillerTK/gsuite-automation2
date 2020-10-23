@@ -1,7 +1,3 @@
-
-#Requires -Modules PSGsuite,ActiveDirectory
-
-
 function Get-MatchingUsers {
     <#
     .SYNOPSIS
@@ -146,8 +142,19 @@ This should be later changed to making an AD account show up as Enabled/Disabled
 
         #$adusers = Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail,objectsid,department,accountexpires,givenname,UserAccountControl
         LogWrite "=== Querying GSuite for users" -Path $LogPath
-        $gsusers = Get-GSUser -filter *
+        
+        try {
 
+            $gsusers = Get-GSUser -filter *
+            
+        } catch {
+
+            LogWrite "ERROR: Retrieving GSUsers command failed.... Exiting script..." -Path $LogPath
+            Write-Error "ERROR: Retrieving GSUsers command failed.... Exiting script... "
+            exit
+
+        }
+        
         # Checks whether path with regex strings exists
         $regexpath = Test-Path -Path "$($MyInvocation.PSScriptRoot)\vars\regexlist.txt"
 

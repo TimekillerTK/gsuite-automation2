@@ -1,4 +1,5 @@
 Import-Module "$PSScriptRoot\GSuiteAutomation.psm1" -Force
+Import-Module PSGsuite -Force
 
 # # The following below is unfortunately required for timestamping log and zip file
 $timevar = Get-Date -Format "yyyyMMdd-HHmmss"

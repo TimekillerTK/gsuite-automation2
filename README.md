@@ -12,7 +12,7 @@ Automation tool that makes use of the [PSGsuite](https://psgsuite.io/) module. L
 Following modules are required:
 * [PSGSuite](https://psgsuite.io/) (make sure you configure it for your domain first)
 * [ActiveDirectory](https://docs.microsoft.com/en-us/windows-hardware/manufacture/desktop/features-on-demand-non-language-fod#remote-server-administration-tools-rsat)
-* [Powershell 7.0+](https://github.com/PowerShell/PowerShell/releases/tag/v7.0.3)
+* [Powershell 7+](https://github.com/PowerShell/PowerShell/releases/tag/v7.0.3)
 
 To run either script, it is **mandatory** to create the following files in the `var` directory with the following variables:
 * `.\var\gsuiteautomation-vars.csv` (used by `CheckCreateGSUser.ps1` and `CheckUserstoDelete.ps1`)
@@ -47,4 +47,5 @@ Will remove both numbers and a string of `[USER]` from all user last names outpu
 * ~~Logging should be done to a single file, it's currently broken up into a bunch of `*.log` files~~
   * Fixed
 * After running scripts, you'll be left with logfiles and zip files. At least one should be cleaned up after a run.
-* Test with Powershell 5, add support
+* ~~Test with Powershell 5, add support~~
+  * Windows Powershell won't be supported, PSGSuite works best with `pwsh`
