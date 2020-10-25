@@ -28,16 +28,20 @@ function Get-MatchingUsers {
     param (
 
         # Supply group in LDAP DistinguishedName format
-        [Parameter(Mandatory=$true)]
-        [string]$GroupDN,
+        #[Parameter(Mandatory=$true)]
+        #[string]$GroupDN,
 
-        [Parameter(ValueFromPipeline=$true)]
-        [string]$Server = $(Get-ADDomainController),
-        [ValidateSet("All","ADDiff","GSDiff")]
+        #[Parameter(ValueFromPipeline=$true)]
+        #[string]$Server = $(Get-ADDomainController),
         
+        [ValidateSet("All","ADDiff","GSDiff")]
         [string]$Scope = "All",
 
-        [string]$LogPath = "$($MyInvocation.PSScriptRoot)\logfile.log"
+        [string]$LogPath = "$($MyInvocation.PSScriptRoot)\logfile.log",
+
+        $adusers,
+
+        $gsusers
 
     )
 
@@ -130,31 +134,6 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
 
-        # First we need to gather information from both AD and GSuite about current users
-        LogWrite "=== Querying AD for group $GroupDN for server $server" -Path $LogPath
-
-        $params = @{
-            Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
-            Server = $Server
-            Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl"
-        }
-        $adusers = Get-ADObject @params
-
-        #$adusers = Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail,objectsid,department,accountexpires,givenname,UserAccountControl
-        LogWrite "=== Querying GSuite for users" -Path $LogPath
-        
-        try {
-
-            $gsusers = Get-GSUser -filter *
-            
-        } catch {
-
-            LogWrite "ERROR: Retrieving GSUsers command failed.... Exiting script..." -Path $LogPath
-            Write-Error "ERROR: Retrieving GSUsers command failed.... Exiting script... "
-            exit
-
-        }
-        
         # Checks whether path with regex strings exists
         $regexpath = Test-Path -Path "$($MyInvocation.PSScriptRoot)\vars\regexlist.txt"
 

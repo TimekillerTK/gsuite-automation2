@@ -1,19 +1,46 @@
 Import-Module "$PSScriptRoot\GSuiteAutomation.psm1" -Force
 Import-Module PSGsuite -Force
 
-# # The following below is unfortunately required for timestamping log and zip file
+# The following below is unfortunately required for timestamping log and zip file
 $timevar = Get-Date -Format "yyyyMMdd-HHmmss"
 $logpath = "$PSScriptRoot\logs\Logfile_$timevar.log"
 
 # Import important variables needed for script run
 $import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
+$GroupDN = (Get-ADGroup $import.group).distinguishedname
+$Server = $import.server
+
+# Import ADUsers
+# First we need to gather information from both AD and GSuite about current users
+LogWrite "=== Querying AD for group $GroupDN for server $server" -Path $LogPath -Verbose
+$params = @{
+    Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
+    Server = $Server
+    Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl"
+}
+$adusers = Get-ADObject @params
+
+# Import GSUsers
+LogWrite "=== Querying GSuite for users" -Path $LogPath -Verbose
+try {
+
+    $gsusers = Get-GSUser -filter *
+    
+} catch {
+
+    LogWrite "ERROR: Retrieving GSUsers command failed.... Exiting script..." -Path $LogPath
+    Write-Error "ERROR: Retrieving GSUsers command failed.... Exiting script... "
+    exit
+
+}
+
 
 LogWrite "Started job for checking for new users" -Verbose -Path $logpath
 $params = @{
-    GroupDN = (Get-ADGroup $import.group).distinguishedname
-    Server = $import.server
     Verbose = $true
     Scope = "ADDiff"
+    ADUsers = $adusers
+    GSUsers = $gsusers
     LogPath = $logpath
 }
 
