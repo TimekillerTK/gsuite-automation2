@@ -26,13 +26,6 @@ function Get-MatchingUsers {
     #>
     [CmdletBinding()]
     param (
-
-        # Supply group in LDAP DistinguishedName format
-        #[Parameter(Mandatory=$true)]
-        #[string]$GroupDN,
-
-        #[Parameter(ValueFromPipeline=$true)]
-        #[string]$Server = $(Get-ADDomainController),
         
         [ValidateSet("All","ADDiff","GSDiff")]
         [string]$Scope = "All",
@@ -76,66 +69,6 @@ function Get-MatchingUsers {
             return $object
 
         }
-        function FixLastName {
-            [CmdletBinding()]
-            param (
-                [Parameter(ValueFromPipelineByPropertyName=$true)][psobject[]]$InputObject,
-                [string[]]$InputRegex,
-                [string]$LogPath
-            )
-        
-        
-            foreach ($object in $InputObject) {
-        
-                $setvalue = 0
-                LogWrite "=== Object worked on is $($object.name)" -Path $LogPath
-                $lastname = $object.name -replace ($object.GivenName + " ")
-                LogWrite "=== Lastname with GivenName removed is: $lastname" -Path $LogPath
-        
-                foreach ($regex in $InputRegex) {
-                    
-                    if ($lastname -match $regex) {
-                        LogWrite "=== Removing regex $regex" -Path $LogPath
-                        $lastname = $lastname -replace $regex
-                        $lastname = $lastname -replace " "
-                        $setvalue = 1
-                        $lastname
-                        LogWrite "Outputting with regex match: $lastname" -Path $LogPath
-                        
-                    } 
-                    
-                }
-        
-                if ($setvalue -eq 1) {
-                    LogWrite "=== Setvalue is $setvalue, exiting iteration for $($object.name)" -Path $LogPath
-                } else {
-                    LogWrite "=== Outputting with no match: $lastname" -Path $LogPath
-                    $lastname
-                }
-            
-            }
-        
-        }
-
-
-<# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
-operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
-
-Using it in this case, allows for checking members of all nested groups
-
-        # Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail
-        # https://docs.microsoft.com/en-us/windows/win32/adsi/search-filter-syntax?redirectedfrom=MSDN
-
-To check for enabled, disabled and expiring users, check the UserAccountControl attribute:
-* 514 = Disabled Account
-* 512 = Enabled Account (normal account)
-* 16 = locked out
-* 
-This should be later changed to making an AD account show up as Enabled/Disabled
-#>
-
-        # Checks whether path with regex strings exists
-        $regexpath = Test-Path -Path "$($MyInvocation.PSScriptRoot)\vars\regexlist.txt"
 
         # Working with $Scope, here's where most of everything will happen, need functions to make it more logical
         switch ($Scope) {
@@ -148,24 +81,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                     foreach ($gsitem in $gsusers) {
                         if (($gsitem.user -replace "@(.*)") -eq ($aditem.mail -replace "@(.*)")){
 
-                            if ($regexpath) {
-
-                                LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
-                                $params = @{
-                                    InputObject = $aditem
-                                    InputRegex = $regexpath
-                                    LogPath = $LogPath
-                                }
-                            } else {
-
-                                LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
-                                $params = @{
-                                    InputObject = $aditem
-                                    LogPath = $LogPath
-                                }
-                            }
-
-                            $lastname = FixLastName @params
+                            #$lastname = #FixLastName @params
                             
                             LogWrite "Creating PSObject: $($aditem.mail) matched with $($gsitem.user)"
                         
@@ -173,7 +89,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                                 ADSID = $aditem.objectsid
                                 ADmail = $aditem.mail
                                 ADFirstName = $aditem.GivenName
-                                ADLastName = $lastname
+                                ADLastName = $aditem.sn
                                 ADEnabled = $aditem.UserAccountControl
                                 GSID = $gsitem.Id
                                 GSmail = $gsitem.user
@@ -210,7 +126,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                             }
                         }
 
-                        $lastname = FixLastName @params          
+                        #$lastname = #FixLastName @params          
                         
                         LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
                         # Creating the Object
@@ -218,7 +134,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                             ADSID = $aditem.objectsid
                             ADmail = $aditem.mail
                             ADFirstName = $aditem.GivenName
-                            ADLastName = $lastname
+                            ADLastName = $aditem.sn
                             ADEnabled = $aditem.UserAccountControl
                         }
                         OutputObject @params2
@@ -276,7 +192,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                                 LogPath = $LogPath
                             }
                         }
-                        $lastname = FixLastName @params          
+                        #$lastname = #FixLastName @params          
                         
                         LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
                         # Creating the Object
@@ -284,7 +200,7 @@ This should be later changed to making an AD account show up as Enabled/Disabled
                             ADSID = $aditem.objectsid
                             ADmail = $aditem.mail
                             ADFirstName = $aditem.GivenName
-                            ADLastName = $lastname
+                            ADLastName = $aditem.sn
                             ADEnabled = $aditem.UserAccountControl
                         }
                         OutputObject @params2

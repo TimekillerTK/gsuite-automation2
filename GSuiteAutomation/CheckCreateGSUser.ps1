@@ -5,10 +5,31 @@ Import-Module PSGsuite -Force
 $timevar = Get-Date -Format "yyyyMMdd-HHmmss"
 $logpath = "$PSScriptRoot\logs\Logfile_$timevar.log"
 
+# Checks whether path with regex strings exists
+$regexpath = Test-Path -Path "$($MyInvocation.PSScriptRoot)\vars\regexlist.txt"
+
 # Import important variables needed for script run
 $import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
 $GroupDN = (Get-ADGroup $import.group).distinguishedname
 $Server = $import.server
+
+<# The querty below is probably the best one, the matching rule OID of 1.2.840.113556.1.4.1941 is a special "extended" match
+operator that walks the chain of ancestry in objects all the way to the root, until it finds a match.
+
+Using it in this case, allows for checking members of all nested groups
+
+        # Get-ADObject -LDAPFilter "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))" -Server $Server -Properties mail
+        # https://docs.microsoft.com/en-us/windows/win32/adsi/search-filter-syntax?redirectedfrom=MSDN
+
+To check for enabled, disabled and expiring users, check the UserAccountControl attribute:
+* 514 = Disabled Account
+* 512 = Enabled Account (normal account)
+* 16 = locked out
+* 
+This should be later changed to making an AD account show up as Enabled/Disabled
+#>
+
+
 
 # Import ADUsers
 # First we need to gather information from both AD and GSuite about current users
@@ -16,8 +37,9 @@ LogWrite "=== Querying AD for group $GroupDN for server $server" -Path $LogPath 
 $params = @{
     Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
     Server = $Server
-    Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl"
+    Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl","sn"
 }
+
 $adusers = Get-ADObject @params
 
 # Import GSUsers
@@ -48,6 +70,25 @@ $params = @{
 # It should be part of the Get-MatchingUsers function!
 $newusers = Get-MatchingUsers @params
 
+# If statement below to be used later for FixLastName (probably)
+
+
+# if ($regexpath) {
+
+#     LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
+#     $params = @{
+#         InputObject = $aditem
+#         InputRegex = $regexpath
+#         LogPath = $LogPath
+#     }
+# } else {
+
+#     LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
+#     $params = @{
+#         InputObject = $aditem
+#         LogPath = $LogPath
+#     }
+# }
 
 # Checks, if no new users need to be added
 If ($null -eq $newusers) {
