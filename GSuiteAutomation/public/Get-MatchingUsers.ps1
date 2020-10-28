@@ -52,7 +52,8 @@ function Get-MatchingUsers {
                 $ADmail,
                 $ADFirstName,
                 $ADLastName,
-                $ADEnabled
+                $ADEnabled,
+                $ADStatus
             )
 
             $object = [PSCustomObject]@{
@@ -61,6 +62,7 @@ function Get-MatchingUsers {
                 ADFirstName = $ADFirstName
                 ADLastName = $ADLastName
                 ADEnabled = $ADEnabled
+                ADStatus = $ADStatus
                 GSID = $GSID
                 GSmail = $GSmail
                 GSFirstName = $GSFirstName
@@ -91,6 +93,7 @@ function Get-MatchingUsers {
                                 ADFirstName = $aditem.GivenName
                                 ADLastName = $aditem.sn
                                 ADEnabled = $aditem.UserAccountControl
+                                ADStatus = $aditem.msExchExtensionAttribute20
                                 GSID = $gsitem.Id
                                 GSmail = $gsitem.user
                                 GSFirstName = $gsitem.name.GivenName
@@ -117,6 +120,7 @@ function Get-MatchingUsers {
                             ADFirstName = $aditem.GivenName
                             ADLastName = $aditem.sn
                             ADEnabled = $aditem.UserAccountControl
+                            ADStatus = $aditem.msExchExtensionAttribute20
                         }
                         OutputObject @params2
                     }
@@ -166,6 +170,7 @@ function Get-MatchingUsers {
                             ADFirstName = $aditem.GivenName
                             ADLastName = $aditem.sn
                             ADEnabled = $aditem.UserAccountControl
+                            ADStatus = $aditem.msExchExtensionAttribute20
                         }
                         OutputObject @params2
                     }
