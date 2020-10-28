@@ -10,6 +10,7 @@ $public = @(
     'Get-MatchingUsers'
     'LogWrite'
     'SendMail'
+    'FixName'
 )
 
 foreach ($file in $public) {
@@ -20,6 +21,7 @@ $functionsToExport = @(
     'Get-MatchingUsers'
     'LogWrite'
     'SendMail'
+    'FixName'
 )
 
 Export-ModuleMember -Function $functionsToExport

@@ -1,3 +1,5 @@
+#Requires -Module ActiveDirectory,PSGsuite
+
 Import-Module "$PSScriptRoot\GSuiteAutomation.psm1" -Force
 Import-Module PSGsuite -Force
 
@@ -5,8 +7,8 @@ Import-Module PSGsuite -Force
 $timevar = Get-Date -Format "yyyyMMdd-HHmmss"
 $logpath = "$PSScriptRoot\logs\Logfile_$timevar.log"
 
-# Checks whether path with regex strings exists
-$regexpath = Test-Path -Path "$($MyInvocation.PSScriptRoot)\vars\regexlist.txt"
+# Setting regexpath
+$regexpath = "$PSScriptRoot\vars\regexlist.txt"
 
 # Import important variables needed for script run
 $import = Import-csv "$PSScriptRoot\vars\gsuiteautomation-vars.csv"
@@ -25,22 +27,30 @@ To check for enabled, disabled and expiring users, check the UserAccountControl 
 * 514 = Disabled Account
 * 512 = Enabled Account (normal account)
 * 16 = locked out
-* 
 This should be later changed to making an AD account show up as Enabled/Disabled
 #>
 
-
-
-# Import ADUsers
 # First we need to gather information from both AD and GSuite about current users
+# Import ADUsers
 LogWrite "=== Querying AD for group $GroupDN for server $server" -Path $LogPath -Verbose
-$params = @{
-    Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
-    Server = $Server
-    Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl","sn"
+try {
+
+    $params = @{
+        Ldapfilter = "(&(memberOf:1.2.840.113556.1.4.1941:=$GroupDN)(ObjectClass=user))"
+        Server = $Server
+        Properties = "mail","objectsid","department","accountexpires","givenname","UserAccountControl","sn"
+    }
+    
+    $adusers = Get-ADObject @params
+    
+}
+catch {
+    LogWrite "ERROR: Retrieving ADUsers command failed.... Exiting script..." -Path $LogPath
+    Write-Error "ERROR: Retrieving ADUsers command failed.... Exiting script... "
+    exit
 }
 
-$adusers = Get-ADObject @params
+
 
 # Import GSUsers
 LogWrite "=== Querying GSuite for users" -Path $LogPath -Verbose
@@ -66,29 +76,18 @@ $params = @{
     LogPath = $logpath
 }
 
-# The below should probably be in a try/catch in case there's an issue pulling from AD or GSuite, or better yet...
-# It should be part of the Get-MatchingUsers function!
 $newusers = Get-MatchingUsers @params
 
-# If statement below to be used later for FixLastName (probably)
-
-
-# if ($regexpath) {
-
-#     LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
-#     $params = @{
-#         InputObject = $aditem
-#         InputRegex = $regexpath
-#         LogPath = $LogPath
+# Below is just for debug
+# $newusers = @(
+#     [PSCustomObject]@{
+#         ADLastName = "Spaghetti9"
 #     }
-# } else {
-
-#     LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
-#     $params = @{
-#         InputObject = $aditem
-#         LogPath = $LogPath
+#     [PSCustomObject]@{
+#         ADLastName = "Pastalasta"
 #     }
-# }
+# )
+
 
 # Checks, if no new users need to be added
 If ($null -eq $newusers) {
@@ -100,7 +99,29 @@ If ($null -eq $newusers) {
     $mailpriority = "Normal"
 
 } else {
-    LogWrite "New GSuite users needed... Creating new users" -Verbose -Path $logpath
+
+    LogWrite "New users found, checking if any names need corrections" -Path $LogPath -verbose
+    # Checks whether path with regex strings exists
+
+    $regexpathcheck = Test-Path -Path $regexpath
+
+    if ($regexpathcheck) {
+
+        LogWrite "Path $PSScriptRoot\vars\regexlist.txt exists, will correct `$newusers AD lastnames by supplied regex" -Path $LogPath -verbose
+    
+        foreach ($user in $newusers) {
+
+            $fixeduser = FixName -InputString $user.ADLastName -InputRegex (Get-Content $regexpath)
+            $user.ADLastName = $fixeduser
+    
+        }
+
+    }
+    else {
+        LogWrite "Path $PSScriptRoot\vars\regexlist.txt does not exist. Skipping..." -Path $LogPath -verbose
+    }
+
+    LogWrite "Creating new users..." -Verbose -Path $logpath
     foreach ($user in $newusers) {
 
         try {
