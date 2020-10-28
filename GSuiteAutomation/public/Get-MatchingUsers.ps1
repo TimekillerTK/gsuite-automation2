@@ -107,26 +107,7 @@ function Get-MatchingUsers {
                 $different1 = foreach ($aditem in $adusers) {
         
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
-                    if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
-        
-                        if ($regexpath) {
-
-                            LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
-                            $params = @{
-                                InputObject = $aditem
-                                InputRegex = $regexpath
-                                LogPath = $LogPath
-                            }
-                        } else {
-
-                            LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
-                            $params = @{
-                                InputObject = $aditem
-                                LogPath = $LogPath
-                            }
-                        }
-
-                        #$lastname = #FixLastName @params          
+                    if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){      
                         
                         LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
                         # Creating the Object
@@ -175,24 +156,7 @@ function Get-MatchingUsers {
         
                     # If the mail property of the $aditem iterated on is NOT in $gsusers.mail
                     if (!(($aditem.mail -replace "@(.*)") -in ($gsusers.user -replace "@(.*)"))){
-        
-                        if ($regexpath) {
-
-                            LogWrite "Path exists: $regexpath, will filter lastnames by regex" -Path $LogPath
-                            $params = @{
-                                InputObject = $aditem
-                                InputRegex = $regexpath
-                                LogPath = $LogPath
-                            }
-                        } else {
-
-                            LogWrite "Path does not exist: $regexpath Skipping..." -Path $LogPath
-                            $params = @{
-                                InputObject = $aditem
-                                LogPath = $LogPath
-                            }
-                        }
-                        #$lastname = #FixLastName @params          
+             
                         
                         LogWrite "Creating PSObject: $($aditem.mail) with no match" -Path $LogPath
                         # Creating the Object
