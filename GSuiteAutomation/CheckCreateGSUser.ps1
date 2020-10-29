@@ -168,8 +168,7 @@ Compress-Archive @archiveparams
 # Mail subject set here, should accept different values
 $mailsubject = "[$status] Script run $(get-date -Format 'dd-MM-yyyy HH:mm:ss')"
 
-# This part needs rethinking, because none of this will be sent and logged,
-# Maybe it's a better idea to store the logs somewhere and create a separate file which gets triggered after everything is done to send the logs?
+
 LogWrite "Sending mail about job status: $status" -Verbose -Path $logpath
 # This var stores the SMTP/MailFrom/MailTo values
 $params = Import-csv "$PSScriptRoot\vars\gsuiteautomation-mailvars.csv"
